@@ -1,0 +1,112 @@
+{
+  "passed": true,
+  "failures": 0,
+  "tests": [
+    {
+      "name": "real_connectome_loaded",
+      "passed": true,
+      "detail": {
+        "neurons": 1800,
+        "edges": 136027
+      }
+    },
+    {
+      "name": "neural_flight_and_movement",
+      "passed": true,
+      "detail": {
+        "distance": 439.3896,
+        "flight": 0.9027705,
+        "spikes": 391152
+      }
+    },
+    {
+      "name": "sensory_ablation_stops_flight",
+      "passed": true,
+      "detail": {
+        "distance": 0,
+        "spikes": 0
+      }
+    },
+    {
+      "name": "connectome_changes_activity",
+      "passed": true,
+      "detail": {
+        "connected": 391152,
+        "disconnected": 113706
+      }
+    },
+    {
+      "name": "sugar_contact_feeds_and_consumes",
+      "passed": true,
+      "detail": {
+        "hunger": 16.157427,
+        "sugar": 40.890335,
+        "feeding": 1
+      }
+    },
+    {
+      "name": "remote_sugar_attraction",
+      "passed": true,
+      "detail": {
+        "hunger": 1.6212491,
+        "distance": 866.32623
+      }
+    },
+    {
+      "name": "swatter_avoidance",
+      "passed": true,
+      "detail": {
+        "before": 60,
+        "after": 251.24654,
+        "fear": 1
+      }
+    },
+    {
+      "name": "swat_kills",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "random_respawn",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "starvation_kills",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "bounded_food",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "display_bounds",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "configuration_validation",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "neural_simulation_faster_than_realtime",
+      "passed": true,
+      "detail": {
+        "simulatedSeconds": 30,
+        "wallSeconds": 0.4565888,
+        "realtimeFactor": 65.7046340164279,
+        "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD"
+      }
+    },
+    {
+      "name": "render_budget_60fps",
+      "passed": true,
+      "detail": {
+        "averageMs": 1.20654
+      }
+    }
+  ]
+}
