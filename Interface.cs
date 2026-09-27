@@ -145,8 +145,8 @@ public sealed class SettingsWindow : Form
         }
         var s=app.Settings;
         Num(nameof(s.FramesPerSecond),"显示帧率（FPS）",20,120,s.FramesPerSecond);
-        Num(nameof(s.PetSize),"苍蝇显示大小（像素）",100,320,s.PetSize);
-        Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,700,(decimal)s.FlightSpeed);
+        Num(nameof(s.PetSize),"苍蝇显示大小（像素）",60,320,s.PetSize);
+        Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,900,(decimal)s.FlightSpeed);
         Num(nameof(s.FearRadius),"苍蝇拍感知范围（像素）",80,800,(decimal)s.FearRadius);
         Num(nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
         Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,1);

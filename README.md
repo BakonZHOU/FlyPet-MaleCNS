@@ -6,7 +6,7 @@ Windows 10/11 x64 独立桌宠，放在 `FlyPet/`，与原来的 `FlyBrain/`、�
 
 生命降到零后，苍蝇会变成自己绘制的低多边形血污泥与断翅，随机等待 12–40 秒复活；托盘的“立即复活”跳过等待。无敌模式下拍打仍会让它短暂警觉、加速逃跑，但不扣血。被击中后的较小速度增益持续到下一次复活。飞行消耗额外饱腹值；饱腹度、糖、威胁和休息共同影响感觉输入及飞行欲望。屏幕边缘会变成视觉输入和向内的目标方向，最后仍有物理边界钳制保证桌宠不飞出屏幕。它会短暂停歇，振翅停止。绘制目标 90 FPS，可在 20–120 FPS 间调整。
 
-外观是自己生成的低多边形 3D 几何与低分辨率贴图效果，有透视、按位置变化的视角、深度排序、动态翅膀和接触阴影。没有使用 Buckshot Roulette 的原始资源。
+外观是自己生成的低多边形 3D 几何与低分辨率贴图效果，有透视、按位置变化的视角、深度排序、动态翅膀和接触阴影。没有使用 Buckshot Roulette 的原始资源。当前默认大小为 90 像素、基础速度为 400 像素/秒；设置中可以继续调高。
 
 ## 大脑与真实性
 
@@ -31,7 +31,7 @@ cd 'E:\Workspace2\project2(brain)'
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`、`FlightSpeed`、`HungerPerMinute`、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`swatter`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`status.json` 定期写到设置目录。
 

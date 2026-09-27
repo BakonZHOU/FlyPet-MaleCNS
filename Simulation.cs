@@ -20,7 +20,7 @@ public sealed class Simulation
     public readonly List<Sugar> Sugars=[];
     readonly Random random;
     Vector2 wander;
-    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration;
+    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown;
     public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);}
     public void Recenter(Rectangle area){Position=new(area.Left+area.Width*.55f,area.Top+area.Height*.45f);wander=Position;Velocity=Vector2.Zero;}
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
@@ -35,12 +35,12 @@ public sealed class Simulation
     void Die(string reason){DeathRemaining=Settings.RespawnMinSeconds+(float)random.NextDouble()*(Settings.RespawnMaxSeconds-Settings.RespawnMinSeconds);Behavior=reason;Grounded=true;Velocity=Vector2.Zero;}
     public void Revive(Rectangle area)
     {
-        Health=100;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=0;Brain.Reset();Recenter(area);
+        Health=100;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=0;Brain.Reset();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
     public void Update(float dt,Rectangle area,Vector2 mouse,bool swatter)
     {
-        Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);
+        Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;
         if(Dead){DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         Alarm=Math.Max(0,Alarm-dt/Settings.AlarmSeconds);
         Fullness=Math.Max(0,Fullness-Settings.HungerPerMinute/60*dt-(Grounded?0:Settings.FlightFullnessCostPerSecond)*Brain.Flight*dt);
@@ -51,7 +51,7 @@ public sealed class Simulation
         foreach(var s in Sugars){float d=Vector2.Distance(Position,s.Position);if(d<foodDist&&d<Settings.SugarAttractionRadius){foodDist=d;food=s;}}
         float mouseDist=Vector2.Distance(mouse,Position);
         float threat=swatter?Math.Clamp(1-mouseDist/Settings.FearRadius,0,1):0;
-        bool eating=food!=null&&foodDist<28&&Fullness<99&&threat<.08f;
+        bool eating=food!=null&&foodDist<65&&Fullness<100&&threat<.08f;
         wanderRemaining-=dt;
         if(wanderRemaining<=0||Vector2.Distance(Position,wander)<32)
         {
@@ -59,7 +59,7 @@ public sealed class Simulation
             wander=new(area.Left+margin+(float)random.NextDouble()*Math.Max(1,area.Width-2*margin),area.Top+margin+(float)random.NextDouble()*Math.Max(1,area.Height-2*margin));
             wanderRemaining=2+(float)random.NextDouble()*3;
         }
-        Vector2 target=(food!=null&&Fullness<90)?food.Position:wander;
+        Vector2 target=(food!=null&&Fullness<100)?food.Position:wander;
         Vector2 desired=target-Position;
         if(threat>.02f){desired=Position-mouse;if(desired.LengthSquared()<1)desired=new(1,-1);}
         float wall=0;
@@ -69,23 +69,28 @@ public sealed class Simulation
             float left=Math.Clamp((margin-(Position.X-area.Left))/margin,0,1),right=Math.Clamp((margin-(area.Right-Position.X))/margin,0,1);
             float top=Math.Clamp((margin-(Position.Y-area.Top))/margin,0,1),bottom=Math.Clamp((margin-(area.Bottom-Position.Y))/margin,0,1);
             wall=Math.Max(Math.Max(left,right),Math.Max(top,bottom));
-            desired+=new Vector2(left-right,top-bottom)*wall*600;
+            desired+=new Vector2(left-right,top-bottom)*wall*1200;
         }
         float targetHeading=MathF.Atan2(desired.Y,desired.X)+MathF.PI/2;
         float delta=Wrap(targetHeading-Heading);
         if(Settings.RestEnabled&&Grounded&&RestRemaining>0)RestRemaining-=dt;
-        if(Settings.RestEnabled&&!Grounded&&flightDuration>4&&Fullness>27&&food==null&&threat<.02f&&Alarm<.01f)
-        {RestRemaining=1+(float)random.NextDouble()*3;flightDuration=0;}
+        if(Settings.RestEnabled&&!Grounded&&flightDuration>10&&Fullness>27&&food==null&&threat<.02f&&Alarm<.01f)
+        {RestRemaining=1+(float)random.NextDouble()*2.5f;flightDuration=0;}
         bool resting=Settings.RestEnabled&&RestRemaining>0&&threat<.02f&&Alarm<.01f;
-        float travel=eating||resting?0:food!=null||Fullness<65?.95f:.16f;
+        float travel=eating||resting?0:.95f;
         Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),eating?1:0,Fullness,Math.Clamp(delta,-1,1),travel,wall,Settings);
         neuralRemainder+=dt;
         while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain);neuralRemainder-=.001f;}
-        float turnRate=Settings.NeuralSteering?Brain.OptomotorTurn*4.2f+Brain.Turn*.8f:Math.Clamp(delta,-1,1)*4.2f;
+        if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!eating&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
+        float turnRate=Settings.NeuralSteering?Brain.OptomotorTurn*6.5f+Brain.Turn*1.2f:Math.Clamp(delta,-1,1)*6.5f;
+        if(food!=null&&threat<.02f)turnRate=Math.Clamp(delta,-1,1)*9f+Brain.OptomotorTurn*1.5f;
+        if(wall>.08f)turnRate+=Math.Clamp(delta,-1,1)*7.5f;
         Heading=Wrap(Heading+turnRate*dt);
-        float speed=Settings.FlightSpeed*Brain.Flight*(.48f+.52f*Math.Clamp(Brain.WingRate/70,0,1))*(1+Brain.Fear*1.8f+InjuryArousal*.22f);
-        if(food!=null&&threat<.02f)speed*=Math.Clamp(foodDist/110,.15f,1);
-        if(eating)speed=0;
+        float neuralSpeed=Math.Clamp(Brain.Flight*(1.25f+Brain.WingRate*.006f),0,1.8f);
+        float speed=Settings.FlightSpeed*neuralSpeed*(1+Brain.Fear*1.8f+InjuryArousal*.22f);
+        if(burstRemaining>0)speed*=2.2f;
+        if(food!=null&&threat<.02f)speed*=Math.Clamp(foodDist/110,.65f,1);
+        if(eating||resting)speed=0;
         Grounded=speed<3&&Velocity.Length()<4;
         if(Grounded)flightDuration=0;else flightDuration+=dt;
         var direction=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));

@@ -47,7 +47,7 @@ static class SelfTest
         flying.Fullness=resting.Fullness=20;
         Advance(flying,8);Advance(resting,8);
         Check("flight_consumes_fullness",flying.Fullness<resting.Fullness-.1f,new{flying=flying.Fullness,zeroFlightCost=resting.Fullness});
-        var invalid=new Settings{FramesPerSecond=999,PetSize=-2,NeuralGain=float.NaN,RespawnMinSeconds=5,RespawnMaxSeconds=-9};invalid.Validate();Check("configuration_validation",invalid.FramesPerSecond==120&&invalid.PetSize==100&&invalid.NeuralGain==1&&invalid.RespawnMaxSeconds==5);
+        var invalid=new Settings{FramesPerSecond=999,PetSize=-2,NeuralGain=float.NaN,RespawnMinSeconds=5,RespawnMaxSeconds=-9};invalid.Validate();Check("configuration_validation",invalid.FramesPerSecond==120&&invalid.PetSize==60&&invalid.NeuralGain==1&&invalid.RespawnMaxSeconds==5);
         var bench=Make();Advance(bench,2);var watch=Stopwatch.StartNew();Advance(bench,30);watch.Stop();
         Check("neural_simulation_faster_than_realtime",watch.Elapsed.TotalSeconds<30,new{simulatedSeconds=30,wallSeconds=watch.Elapsed.TotalSeconds,realtimeFactor=30/watch.Elapsed.TotalSeconds,processor=Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER")});
         using var renderer=new FlyRenderer();using var image=new Bitmap(1200,780);image.SetResolution(96,96);using var g=Graphics.FromImage(image);

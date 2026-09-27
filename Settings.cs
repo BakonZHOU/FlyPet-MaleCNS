@@ -5,15 +5,15 @@ namespace FlyPet;
 public sealed class Settings
 {
     public int FramesPerSecond { get; set; } = 90;
-    public int PetSize { get; set; } = 180;
-    public float FlightSpeed { get; set; } = 165;
+    public int PetSize { get; set; } = 90;
+    public float FlightSpeed { get; set; } = 400;
     public float FearRadius { get; set; } = 250;
     public float SwatDamage { get; set; } = 40;
-    public float HungerPerMinute { get; set; } = 4;
-    public float FlightFullnessCostPerSecond { get; set; } = .35f;
+    public float HungerPerMinute { get; set; } = 1.6f;
+    public float FlightFullnessCostPerSecond { get; set; } = .02f;
     public float AlarmSeconds { get; set; } = 1.4f;
     public float FeedPerSecond { get; set; } = 15;
-    public float StarvationDamagePerSecond { get; set; } = 2;
+    public float StarvationDamagePerSecond { get; set; } = .35f;
     public float RespawnMinSeconds { get; set; } = 12;
     public float RespawnMaxSeconds { get; set; } = 40;
     public float NeuralGain { get; set; } = 1;
@@ -36,18 +36,25 @@ public sealed class Settings
     public static Settings Load()
     {
         LoadWarning=null;
-        try { var s = File.Exists(FileName) ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(FileName), JsonOptions) ?? new() : new(); s.Validate(); return s; }
+        try
+        {
+            bool exists=File.Exists(FileName);string raw=exists?File.ReadAllText(FileName):"";
+            var s=exists?JsonSerializer.Deserialize<Settings>(raw, JsonOptions) ?? new():new();
+            if(exists&&!JsonDocument.Parse(raw).RootElement.TryGetProperty(nameof(FlightFullnessCostPerSecond),out _))
+            {s.PetSize=90;s.FlightSpeed=400;s.HungerPerMinute=1.6f;s.FlightFullnessCostPerSecond=.02f;s.StarvationDamagePerSecond=.35f;s.FramesPerSecond=90;s.ShowMeters=false;s.Save();}
+            s.Validate(); return s;
+        }
         catch (Exception e) { LoadWarning = "设置文件无法读取，已使用默认值：" + e.Message; return new(); }
     }
     static float Safe(float value, float min, float max, float fallback) => float.IsFinite(value) ? Math.Clamp(value,min,max) : fallback;
     public void Validate()
     {
-        FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, 100, 320);
-        FlightSpeed = Safe(FlightSpeed, 30, 700,165); FearRadius = Safe(FearRadius,80,800,250);
-        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.35f);
+        FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, 60, 320);
+        FlightSpeed = Safe(FlightSpeed, 30, 900,400); FearRadius = Safe(FearRadius,80,800,250);
+        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.02f);
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);
-        SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,4);
-        FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,2);
+        SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,1.6f);
+        FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,.35f);
         RespawnMinSeconds = Safe(RespawnMinSeconds,1,3600,12); RespawnMaxSeconds = Safe(RespawnMaxSeconds,RespawnMinSeconds,7200,40);
         NeuralGain = Safe(NeuralGain,0,4,1); SensoryGain = Safe(SensoryGain,0,4,1);
         SugarAttractionRadius = Safe(SugarAttractionRadius,100,10000,2200); MaxSugar = Math.Clamp(MaxSugar,1,30);

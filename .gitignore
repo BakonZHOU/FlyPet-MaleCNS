@@ -2,4 +2,5 @@ bin/
 obj/
 dist/
 test-results/
+test-results-tuned*/
 *.user
