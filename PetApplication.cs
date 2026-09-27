@@ -191,7 +191,13 @@ public sealed class PetApplication : ApplicationContext
             w.Render((int)s.Position.X-24,(int)s.Position.Y-24,48,g=>FlyRenderer.DrawSugar(g,48,s.Amount));
         }
         if(Sim.Dead&&!Sim.RemainsVisible)pet.Hide();
-        else {if(!pet.Visible)pet.Show();pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));pet.BringToFront();}
+        else
+        {
+            if(!pet.Visible)pet.Show();
+            pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));
+            bool uiOpen=tray.ContextMenuStrip?.Visible==true||dashboard.Visible||settingsWindow?.Visible==true||evidenceWindow?.Visible==true||brainMap?.Visible==true||deathMenu?.Visible==true;
+            if(!uiOpen)pet.BringToFront();
+        }
         if(Mode!=ToolMode.Normal)
         {
             var mouse=Control.MousePosition;if(!cursor.Visible)cursor.Show();
