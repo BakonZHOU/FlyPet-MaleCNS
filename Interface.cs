@@ -154,6 +154,8 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.AlarmSeconds),"受击后快速逃离持续秒数",.1m,10,(decimal)s.AlarmSeconds,1);
         Num(nameof(s.FeedPerSecond),"进食速率（每秒）",1,100,(decimal)s.FeedPerSecond);
         Num(nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,1);
+        Num(nameof(s.AlbinoChance),"白眼果蝇出现概率",0,1,(decimal)s.AlbinoChance,2);
+        Num(nameof(s.AlbinoSpeedMultiplier),"白眼果蝇速度倍率",1,3,(decimal)s.AlbinoSpeedMultiplier,2);
         Num(nameof(s.RespawnMinSeconds),"随机复活最短等待（秒）",1,3600,(decimal)s.RespawnMinSeconds);
         Num(nameof(s.RespawnMaxSeconds),"随机复活最长等待（秒）",1,7200,(decimal)s.RespawnMaxSeconds);
         Num(nameof(s.NeuralGain),"连接增益（0 可消融突触传播）",0,4,(decimal)s.NeuralGain,1);

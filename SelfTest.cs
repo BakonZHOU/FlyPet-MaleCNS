@@ -43,6 +43,8 @@ static class SelfTest
         Check("invincible_hit_still_alarms",protectedFly.Health==100&&protectedFly.Alarm>0&&protectedFly.InjuryArousal>0,new{health=protectedFly.Health,alarm=protectedFly.Alarm,injury=protectedFly.InjuryArousal});
         Advance(protectedFly,3);Check("injury_arousal_persists",protectedFly.Alarm==0&&protectedFly.InjuryArousal>0);
         protectedFly.Revive(area);Check("revival_clears_injury",protectedFly.Health==100&&protectedFly.InjuryArousal==0&&protectedFly.Alarm==0);
+        var albino=Make(new(){AlbinoChance=1,AlbinoSpeedMultiplier=1.5f});Check("albino_hidden_skin",albino.Albino&&albino.Health==albino.MaxHealth&&albino.MaxHealth==180);
+        var corpse=Make(new(){SwatDamage=100,RespawnMinSeconds=1,RespawnMaxSeconds=1});corpse.Hit(corpse.Position);corpse.CleanRemains();Advance(corpse,2);Check("cleaned_corpse_stays_clean",corpse.Dead&&!corpse.RemainsVisible);
         var flying=Make(new(){RestEnabled=false,HungerPerMinute=0});var resting=Make(new(){RestEnabled=false,HungerPerMinute=0,FlightFullnessCostPerSecond=0});
         flying.Fullness=resting.Fullness=20;
         Advance(flying,8);Advance(resting,8);

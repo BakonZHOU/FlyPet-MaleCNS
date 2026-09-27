@@ -8,6 +8,8 @@ Windows 10/11 x64 独立桌宠，放在 `FlyPet/`，与原来的 `FlyBrain/`、�
 
 外观是自己生成的低多边形 3D 几何与低分辨率贴图效果，有透视、按位置变化的视角、深度排序、动态翅膀和接触阴影。没有使用 Buckshot Roulette 的原始资源。当前默认大小为 90 像素、基础速度为 400 像素/秒；设置中可以继续调高。
 
+苍蝇死亡后，鼠标悬停在泥状残骸上会出现暗色复古选项框：“复活吧我的爱人”和“清理”。白眼果蝇会在初次加载或复活时按概率出现，具有浅色身体、白眼、更高生命和更快速度；出现时托盘会弹出“出金了！是白眼果蝇！”。
+
 ## 大脑与真实性
 
 内置回路从本机 MaleCNS v1.0 数据导出，共 1,800 个神经元、135,624 条非零有符号连接，是原始全图的一个诱导子图。[MaleCNS 数据下载页](https://male-cns.janelia.org/download/)提供神经元注释与连接权重；本程序内嵌提取结果，不需要运行时访问原始大文件。已知类型包括 LC4/LPLC2 视觉、DNp01 逃逸、DNg02/DNa08/DNp31 飞行、DNa02 和 DNp04 转向、MDN 倒退、DLMn/DVMn 翅肌、甜味 GRN 和 MN9 进食相关神经元，另有强连接的一跳邻居。
@@ -31,7 +33,7 @@ cd 'E:\Workspace2\project2(brain)'
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`AlbinoChance`、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 

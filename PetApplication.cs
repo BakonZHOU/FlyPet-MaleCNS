@@ -24,6 +24,7 @@ public sealed class PetApplication : ApplicationContext
     SettingsWindow? settingsWindow;
     NeuralEvidenceWindow? evidenceWindow;
     BrainMapWindow? brainMap;
+    DeathMenuWindow? deathMenu;
     readonly LayerWindow pet,cursor;
     readonly List<LayerWindow> sugarWindows=[];
     readonly FlyRenderer renderer=new();
@@ -53,7 +54,7 @@ public sealed class PetApplication : ApplicationContext
         }
         dashboard.Icon=icon;
         var menu=new ContextMenuStrip();menu.Items.Add("显示 / 隐藏桌宠",null,(_,_)=>ToggleVisible());
-        menu.Items.Add("启动菜单",null,(_,_)=>ShowDashboard());menu.Items.Add("大脑活动图…",null,(_,_)=>ShowBrainMap());menu.Items.Add("神经连接证据…",null,(_,_)=>ShowEvidence());menu.Items.Add("设置…",null,(_,_)=>ShowSettings());menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("启动菜单",null,(_,_)=>ShowDashboard());menu.Items.Add("大脑活动图…",null,(_,_)=>ShowBrainMap());menu.Items.Add("设置…",null,(_,_)=>ShowSettings());menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("投放糖",null,(_,_)=>{StartPet();SetMode(ToolMode.Sugar);});
         menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
         var meterItem=new ToolStripMenuItem("显示状态条"){Checked=Settings.ShowMeters,CheckOnClick=true};meterItem.CheckedChanged+=(_,_)=>{Settings.ShowMeters=meterItem.Checked;Settings.Save();};menu.Items.Add(meterItem);
@@ -135,7 +136,7 @@ public sealed class PetApplication : ApplicationContext
     {
         // Hook returns immediately. Work is deferred to the normal event loop; no synchronous rendering or I/O.
         if(!visible||Paused)return false;
-        if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p)))return false;
+        if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p))||(deathMenu?.Visible==true&&deathMenu.Bounds.Contains(p)))return false;
         if(tray.ContextMenuStrip?.Visible==true||!Area.Contains(p))return false;
         if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Settings.PetSize*.55f+18)
         {pendingClick=p;pendingMode=ToolMode.Swatter;return true;}
@@ -173,13 +174,14 @@ public sealed class PetApplication : ApplicationContext
         {
             double duration=now-statsPrevious;MeasuredFps=frameCounter/duration;RealTimeRatio=simulatedWindow/duration;frameCounter=0;simulatedWindow=0;statsPrevious=now;
             evidenceWindow?.RefreshEvidence();tray.Text=$"生命{Sim.Health:0}% 饱腹{Sim.Fullness:0}% · {(Settings.Invincible?"无敌":Sim.Behavior)}";
+            if(Sim.ConsumeAlbinoAnnouncement())tray.ShowBalloonTip(6500,"FlyPet","出金了！是白眼果蝇！",ToolTipIcon.Info);
             if(((int)now)%5==0)SaveStatus();
         }
+        UpdateDeathMenu(Control.MousePosition);
     }
     void Draw()
     {
         int size=Settings.PetSize;
-        pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));
         while(sugarWindows.Count<Sim.Sugars.Count){var w=new LayerWindow(48,"FlyPet · 糖粒");sugarWindows.Add(w);}
         while(sugarWindows.Count>Sim.Sugars.Count){sugarWindows[^1].Dispose();sugarWindows.RemoveAt(sugarWindows.Count-1);}
         for(int i=0;i<Sim.Sugars.Count;i++)
@@ -187,6 +189,8 @@ public sealed class PetApplication : ApplicationContext
             var s=Sim.Sugars[i];var w=sugarWindows[i];if(!w.Visible)w.Show();
             w.Render((int)s.Position.X-24,(int)s.Position.Y-24,48,g=>FlyRenderer.DrawSugar(g,48,s.Amount));
         }
+        if(Sim.Dead&&!Sim.RemainsVisible)pet.Hide();
+        else {if(!pet.Visible)pet.Show();pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));pet.BringToFront();}
         if(Mode!=ToolMode.Normal)
         {
             var mouse=Control.MousePosition;if(!cursor.Visible)cursor.Show();
@@ -201,6 +205,13 @@ public sealed class PetApplication : ApplicationContext
             });
         }
     }
+    void UpdateDeathMenu(Point mouse)
+    {
+        bool overCorpse=visible&&Sim.Dead&&Sim.RemainsVisible&&Area.Contains(mouse)&&Vector2.Distance(new(mouse.X,mouse.Y),Sim.Position)<Settings.PetSize*.82f+58;
+        if(deathMenu==null&&overCorpse)deathMenu=new DeathMenuWindow(()=>{Sim.Revive(Area);StartPet();},()=>{Sim.CleanRemains();});
+        if(deathMenu==null)return;
+        if(overCorpse||deathMenu.Bounds.Contains(mouse))deathMenu.ShowAt(Area,new((int)Sim.Position.X,(int)Sim.Position.Y));else deathMenu.Hide();
+    }
     void SaveStatus()
     {
         try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,feeding=Sim.Brain.Feeding},Settings.JsonOptions));}catch(IOException){}
@@ -208,7 +219,7 @@ public sealed class PetApplication : ApplicationContext
     protected override void ExitThreadCore()
     {
         if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
-        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();pet.Dispose();cursor.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
+        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
 

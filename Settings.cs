@@ -14,6 +14,8 @@ public sealed class Settings
     public float AlarmSeconds { get; set; } = 1.4f;
     public float FeedPerSecond { get; set; } = 15;
     public float StarvationDamagePerSecond { get; set; } = .35f;
+    public float AlbinoChance { get; set; } = .04f;
+    public float AlbinoSpeedMultiplier { get; set; } = 1.55f;
     public float RespawnMinSeconds { get; set; } = 12;
     public float RespawnMaxSeconds { get; set; } = 40;
     public float NeuralGain { get; set; } = 1;
@@ -55,6 +57,7 @@ public sealed class Settings
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);
         SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,1.6f);
         FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,.35f);
+        AlbinoChance=Safe(AlbinoChance,0,1,.04f);AlbinoSpeedMultiplier=Safe(AlbinoSpeedMultiplier,1,3,1.55f);
         RespawnMinSeconds = Safe(RespawnMinSeconds,1,3600,12); RespawnMaxSeconds = Safe(RespawnMaxSeconds,RespawnMinSeconds,7200,40);
         NeuralGain = Safe(NeuralGain,0,4,1); SensoryGain = Safe(SensoryGain,0,4,1);
         SugarAttractionRadius = Safe(SugarAttractionRadius,100,10000,2200); MaxSugar = Math.Clamp(MaxSugar,1,30);

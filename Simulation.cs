@@ -15,33 +15,40 @@ public sealed class Simulation
     public Vector2 Position,Velocity;
     public float Heading,Health=100,Fullness=65,DeathRemaining,HitFlash,Time,Alarm,InjuryArousal,RestRemaining;
     public bool Dead=>Health<=0;
+    public bool Albino { get; private set; }
+    public bool AlbinoSpawnedPending { get; private set; }
+    public bool RemainsVisible { get; private set; } = true;
+    public float MaxHealth => Albino ? 180 : 100;
     public bool Grounded {get;private set;}
     public string Behavior="苏醒";
     public readonly List<Sugar> Sugars=[];
     readonly Random random;
     Vector2 wander;
     float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown;
-    public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);}
+    public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);RollSkin();Health=MaxHealth;}
     public void Recenter(Rectangle area){Position=new(area.Left+area.Width*.55f,area.Top+area.Height*.45f);wander=Position;Velocity=Vector2.Zero;}
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
     public bool Hit(Vector2 point)
     {
         if(Dead||hitCooldown>0||Vector2.Distance(point,Position)>Settings.PetSize*.29f+20)return false;
         HitFlash=.28f;hitCooldown=.22f;Alarm=1;InjuryArousal=Math.Min(1,InjuryArousal+.30f);RestRemaining=0;
-        if(!Settings.Invincible)Health=Math.Max(0,Health-Settings.SwatDamage);
+        if(!Settings.Invincible)Health=Math.Max(0,Health-Settings.SwatDamage*(Albino ? .58f : 1));
         if(Dead)Die("被拍死");
         return true;
     }
-    void Die(string reason){DeathRemaining=Settings.RespawnMinSeconds+(float)random.NextDouble()*(Settings.RespawnMaxSeconds-Settings.RespawnMinSeconds);Behavior=reason;Grounded=true;Velocity=Vector2.Zero;}
+    void Die(string reason){RemainsVisible=true;DeathRemaining=Settings.RespawnMinSeconds+(float)random.NextDouble()*(Settings.RespawnMaxSeconds-Settings.RespawnMinSeconds);Behavior=reason;Grounded=true;Velocity=Vector2.Zero;}
+    void RollSkin(){Albino=random.NextDouble()<Settings.AlbinoChance;AlbinoSpawnedPending=Albino;RemainsVisible=true;}
+    public bool ConsumeAlbinoAnnouncement(){if(!AlbinoSpawnedPending)return false;AlbinoSpawnedPending=false;return true;}
+    public void CleanRemains(){if(Dead){RemainsVisible=false;DeathRemaining=0;Behavior="已清理";}}
     public void Revive(Rectangle area)
     {
-        Health=100;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=0;Brain.Reset();Recenter(area);
+        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=0;Brain.Reset();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
     public void Update(float dt,Rectangle area,Vector2 mouse,bool cursorThreat)
     {
         Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;
-        if(Dead){DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
+        if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         Alarm=Math.Max(0,Alarm-dt/Settings.AlarmSeconds);
         Fullness=Math.Max(0,Fullness-Settings.HungerPerMinute/60*dt-(Grounded?0:Settings.FlightFullnessCostPerSecond)*Brain.Flight*dt);
         if(Fullness<=.01f&&!Settings.Invincible){Health=Math.Max(0,Health-Settings.StarvationDamagePerSecond*dt);if(Dead){Die("饥饿死亡");return;}}
@@ -87,7 +94,7 @@ public sealed class Simulation
         if(wall>.08f)turnRate+=Math.Clamp(delta,-1,1)*7.5f;
         Heading=Wrap(Heading+turnRate*dt);
         float neuralSpeed=Math.Clamp(Brain.Flight*(1.25f+Brain.WingRate*.006f),0,1.8f);
-        float speed=Settings.FlightSpeed*neuralSpeed*(1+Brain.Fear*1.8f+InjuryArousal*.22f);
+        float speed=Settings.FlightSpeed*neuralSpeed*(Albino?Settings.AlbinoSpeedMultiplier:1)*(1+Brain.Fear*1.8f+InjuryArousal*.22f);
         if(burstRemaining>0)speed*=2.2f;
         if(food!=null&&threat<.02f)speed*=Math.Clamp(foodDist/110,.65f,1);
         if(eating||resting)speed=0;

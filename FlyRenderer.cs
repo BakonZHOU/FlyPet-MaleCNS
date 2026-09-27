@@ -29,15 +29,17 @@ public sealed class FlyRenderer : IDisposable
         using(var coreShadow=new SolidBrush(Color.FromArgb(48,7,6,4)))g.FillEllipse(coreShadow,50+nx*10,90+ny*6,43*shadowSpread,9*shadowSpread);
         faces.Clear();projected.Clear();
         // Overlapping tapered abdominal segments create a readable volume and self-occlusion.
-        Ellipsoid(new(0,.31f,-.02f),new(.39f,.50f,.38f),Color.FromArgb(73,67,47),1);
-        Ellipsoid(new(0,.65f,-.035f),new(.35f,.43f,.34f),Color.FromArgb(59,53,37),3);
-        Ellipsoid(new(0,.96f,-.06f),new(.28f,.34f,.28f),Color.FromArgb(82,69,42),5);
-        Ellipsoid(new(0,1.19f,-.08f),new(.19f,.23f,.20f),Color.FromArgb(48,43,31),7);
+        var abdomen1=sim.Albino?Color.FromArgb(145,125,96):Color.FromArgb(73,67,47);var abdomen2=sim.Albino?Color.FromArgb(124,105,80):Color.FromArgb(59,53,37);var abdomen3=sim.Albino?Color.FromArgb(164,139,101):Color.FromArgb(82,69,42);var abdomen4=sim.Albino?Color.FromArgb(106,90,70):Color.FromArgb(48,43,31);
+        Ellipsoid(new(0,.31f,-.02f),new(.39f,.50f,.38f),abdomen1,1);
+        Ellipsoid(new(0,.65f,-.035f),new(.35f,.43f,.34f),abdomen2,3);
+        Ellipsoid(new(0,.96f,-.06f),new(.28f,.34f,.28f),abdomen3,5);
+        Ellipsoid(new(0,1.19f,-.08f),new(.19f,.23f,.20f),abdomen4,7);
         // Low resolution facets and asymmetric grain are generated, not copied textures.
         Ellipsoid(new(0,-.18f,.08f),new(.48f,.50f,.43f),Thorax,17);
-        Ellipsoid(new(0,-.72f,.11f),new(.42f,.34f,.35f),Color.FromArgb(89,78,52),29);
-        Ellipsoid(new(-.32f,-.76f,.22f),new(.23f,.28f,.26f),Eye,37);
-        Ellipsoid(new(.32f,-.76f,.22f),new(.23f,.28f,.26f),Eye,47);
+        Ellipsoid(new(0,-.72f,.11f),new(.42f,.34f,.35f),sim.Albino?Color.FromArgb(178,154,115):Color.FromArgb(89,78,52),29);
+        var eye=sim.Albino?Color.FromArgb(245,240,218):Eye;
+        Ellipsoid(new(-.32f,-.76f,.22f),new(.23f,.28f,.26f),eye,37);
+        Ellipsoid(new(.32f,-.76f,.22f),new(.23f,.28f,.26f),eye,47);
         float flap=sim.Grounded?.06f:MathF.Sin(sim.Time*135)*.52f+.35f;
         for(int side=-1;side<=1;side+=2)
         {
@@ -91,7 +93,7 @@ public sealed class FlyRenderer : IDisposable
         if(meters)
         {
             using var bg=new SolidBrush(Color.FromArgb(170,18,21,18));g.FillRectangle(bg,43,124,58,11);
-            using var hp=new SolidBrush(sim.Dead?Color.FromArgb(154,70,52):Color.FromArgb(178,197,126));g.FillRectangle(hp,46,127,(int)(52*sim.Health/100),2);
+            using var hp=new SolidBrush(sim.Dead?Color.FromArgb(154,70,52):Color.FromArgb(178,197,126));g.FillRectangle(hp,46,127,(int)(52*Math.Clamp(sim.Health/sim.MaxHealth,0,1)),2);
             using var hunger=new SolidBrush(Color.FromArgb(198,152,90));g.FillRectangle(hunger,46,132,(int)(52*sim.Fullness/100),1);
         }
         var state=output.Save();output.InterpolationMode=InterpolationMode.NearestNeighbor;output.PixelOffsetMode=PixelOffsetMode.Half;
