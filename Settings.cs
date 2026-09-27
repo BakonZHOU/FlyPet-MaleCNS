@@ -40,10 +40,13 @@ public sealed class Settings
         LoadWarning=null;
         try
         {
-            bool exists=File.Exists(FileName);string raw=exists?File.ReadAllText(FileName):"";
+            bool exists=File.Exists(FileName);string raw=exists?File.ReadAllText(FileName):"";using var doc=exists?JsonDocument.Parse(raw):null;
             var s=exists?JsonSerializer.Deserialize<Settings>(raw, JsonOptions) ?? new():new();
-            if(exists&&!JsonDocument.Parse(raw).RootElement.TryGetProperty(nameof(FlightFullnessCostPerSecond),out _))
-            {s.PetSize=90;s.FlightSpeed=400;s.HungerPerMinute=1.6f;s.FlightFullnessCostPerSecond=.02f;s.StarvationDamagePerSecond=.35f;s.FramesPerSecond=90;s.ShowMeters=false;s.Save();}
+            bool changed=false;
+            if(exists&&!doc!.RootElement.TryGetProperty(nameof(FlightFullnessCostPerSecond),out _))
+            {s.PetSize=90;s.FlightSpeed=400;s.HungerPerMinute=1.6f;s.FlightFullnessCostPerSecond=.02f;s.StarvationDamagePerSecond=.35f;s.FramesPerSecond=90;s.ShowMeters=false;changed=true;}
+            if(exists&&!doc!.RootElement.TryGetProperty(nameof(AlbinoChance),out _)){s.AlbinoChance=.04f;s.AlbinoSpeedMultiplier=1.55f;changed=true;}
+            if(changed)s.Save();
             s.Validate(); return s;
         }
         catch (Exception e) { LoadWarning = "设置文件无法读取，已使用默认值：" + e.Message; return new(); }
