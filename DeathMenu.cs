@@ -9,15 +9,15 @@ public sealed class DeathMenuWindow : Form
     public DeathMenuWindow(Action onRevive,Action onClean)
     {
         FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;StartPosition=FormStartPosition.Manual;
-        AutoScaleMode=AutoScaleMode.None;ClientSize=new(292,62);BackColor=Color.FromArgb(22,23,20);DoubleBuffered=true;
+        AutoScaleMode=AutoScaleMode.None;ClientSize=new(330,62);BackColor=Color.FromArgb(22,23,20);DoubleBuffered=true;
         // Give the longer Chinese label enough room and use a CJK font with stable metrics.
-        revive=Choice("复活吧我的爱人!",new(8,9),new(202,44),onRevive,Color.FromArgb(183,194,133));
-        clean=Choice("清理",new(218,9),new(66,44),onClean,Color.FromArgb(187,113,92));
+        revive=Choice("复活吧我的爱人!",new(8,9),new(232,44),onRevive,Color.FromArgb(183,194,133));
+        clean=Choice("清理",new(248,9),new(74,44),onClean,Color.FromArgb(187,113,92));
         Controls.Add(revive);Controls.Add(clean);Paint+=PaintCard;
     }
     Button Choice(string text,Point location,Size size,Action action,Color accent)
     {
-        var b=new Button{Text=text,Location=location,Size=size,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(37,39,32),ForeColor=accent,Font=new Font("Microsoft YaHei UI",10,FontStyle.Bold),TextAlign=ContentAlignment.MiddleCenter,Padding=Padding.Empty,UseCompatibleTextRendering=true,TabStop=false,Cursor=Cursors.Hand};
+        var b=new Button{Text=text,Location=location,Size=size,FlatStyle=FlatStyle.Flat,BackColor=Color.FromArgb(37,39,32),ForeColor=accent,Font=new Font("Microsoft YaHei UI",9,FontStyle.Bold),TextAlign=ContentAlignment.MiddleCenter,Padding=Padding.Empty,AutoEllipsis=false,UseCompatibleTextRendering=false,TabStop=false,Cursor=Cursors.Hand};
         b.UseVisualStyleBackColor=false;b.FlatAppearance.BorderSize=1;b.FlatAppearance.BorderColor=Color.FromArgb(92,82,60);b.FlatAppearance.MouseOverBackColor=Color.FromArgb(58,51,39);b.Click+=(_,_)=>{Hide();action();};return b;
     }
     void PaintCard(object? sender,PaintEventArgs e)
