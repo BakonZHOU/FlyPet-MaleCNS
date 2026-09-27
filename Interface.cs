@@ -52,12 +52,12 @@ public sealed class Dashboard : Form
         Controls.Add(Theme.Label("一只住在桌面上的小苍蝇。",29,66,650,30,11,Theme.Muted));
         preview=new(app){Location=new(28,115),Size=new(360,328)};Controls.Add(preview);
         Controls.Add(Theme.Label("自由飞行，偶尔捣乱。",418,115,390,40,20));
-        Controls.Add(Theme.Label("投下一粒糖，看它靠近。\n换上苍蝇拍，它会察觉并逃走。\n生命归零后，在随机的时间重新醒来。",420,171,390,86,11,Theme.Muted));
+        Controls.Add(Theme.Label("投下一粒糖，看它靠近。\n鼠标靠近时它会躲开，直接点击苍蝇即可击中。\n生命归零后，在随机的时间重新醒来。",420,171,390,86,11,Theme.Muted));
         status=Theme.Label("",420,272,390,34,13,Theme.Accent);Controls.Add(status);
         metrics=Theme.Label("",420,311,390,65,9,Theme.Muted);Controls.Add(metrics);
         Controls.Add(Theme.Button("放飞苍蝇  →",420,397,220,()=>{app.StartPet();Hide();},true));
         Controls.Add(Theme.Button("设置",650,397,158,()=>app.ShowSettings()));
-        Controls.Add(Theme.Label("右下角托盘菜单管理全部功能  /  Esc 退出工具模式",29,465,760,24,9,Theme.Muted));
+        Controls.Add(Theme.Label("右下角托盘菜单管理全部功能  /  鼠标靠近会自动躲避",29,465,760,24,9,Theme.Muted));
         Controls.Add(Theme.Label("真实连接子图 + 可调行为模型  ·  CPU 实时运行  ·  本地离线",29,496,760,22,9,Theme.Muted));
         FormClosing+=(_,e)=>{if(!exiting){e.Cancel=true;Hide();}};ResumeLayout(false);
     }
@@ -147,7 +147,7 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.FramesPerSecond),"显示帧率（FPS）",20,120,s.FramesPerSecond);
         Num(nameof(s.PetSize),"苍蝇显示大小（像素）",60,320,s.PetSize);
         Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,900,(decimal)s.FlightSpeed);
-        Num(nameof(s.FearRadius),"苍蝇拍感知范围（像素）",80,800,(decimal)s.FearRadius);
+        Num(nameof(s.FearRadius),"鼠标威胁感知范围（像素）",80,800,(decimal)s.FearRadius);
         Num(nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
         Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,1);
         Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,1);

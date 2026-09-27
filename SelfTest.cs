@@ -30,7 +30,7 @@ static class SelfTest
         var seek=Make();seek.Fullness=20;seek.AddSugar(seek.Position+new Vector2(350,0));Advance(seek,20);
         Check("remote_sugar_attraction",seek.Fullness>30,new{fullness=seek.Fullness,distance=Vector2.Distance(seek.Position,seek.Sugars.FirstOrDefault()?.Position??seek.Position),x=seek.Position.X,y=seek.Position.Y,heading=seek.Heading,turn=seek.Brain.Turn,opto=seek.Brain.OptomotorRate,flight=seek.Brain.Flight});
         var scared=Make();var threat=scared.Position+new Vector2(60,0);float d0=Vector2.Distance(scared.Position,threat);Advance(scared,.7f,true,threat);
-        Check("swatter_avoidance",Vector2.Distance(scared.Position,threat)>d0+20,new{before=d0,after=Vector2.Distance(scared.Position,threat),fear=scared.Brain.Fear});
+        Check("cursor_avoidance",Vector2.Distance(scared.Position,threat)>d0+20,new{before=d0,after=Vector2.Distance(scared.Position,threat),fear=scared.Brain.Fear});
         var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
         Advance(dying,2.1f);Check("random_respawn",!dying.Dead&&dying.Health==100);
         var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead);

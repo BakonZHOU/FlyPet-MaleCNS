@@ -38,7 +38,7 @@ public sealed class Simulation
         Health=100;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=0;Brain.Reset();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
-    public void Update(float dt,Rectangle area,Vector2 mouse,bool swatter)
+    public void Update(float dt,Rectangle area,Vector2 mouse,bool cursorThreat)
     {
         Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;
         if(Dead){DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
@@ -50,7 +50,7 @@ public sealed class Simulation
         Sugar? food=null;float foodDist=float.MaxValue;
         foreach(var s in Sugars){float d=Vector2.Distance(Position,s.Position);if(d<foodDist&&d<Settings.SugarAttractionRadius){foodDist=d;food=s;}}
         float mouseDist=Vector2.Distance(mouse,Position);
-        float threat=swatter?Math.Clamp(1-mouseDist/Settings.FearRadius,0,1):0;
+        float threat=cursorThreat?Math.Clamp(1-mouseDist/Settings.FearRadius,0,1):0;
         bool eating=food!=null&&foodDist<65&&Fullness<100&&threat<.08f;
         wanderRemaining-=dt;
         if(wanderRemaining<=0||Vector2.Distance(Position,wander)<32)
@@ -100,7 +100,7 @@ public sealed class Simulation
             float amount=Math.Min(food!.Amount,Math.Min(100-Fullness,Settings.FeedPerSecond*Brain.Feeding*dt));
             Fullness+=amount;food.Amount-=amount;Health=Math.Min(100,Health+amount*.3f);
         }
-        Behavior=threat>.02f||Brain.Fear>.2f?"逃离苍蝇拍":eating?"吃糖":Grounded?"停歇":food!=null&&Fullness<90?"寻找糖粒":wall>.25f?"避开屏幕边缘":"自由飞行";
+        Behavior=threat>.02f||Brain.Fear>.2f?"逃离鼠标":eating?"吃糖":Grounded?"停歇":food!=null&&Fullness<90?"寻找糖粒":wall>.25f?"避开屏幕边缘":"自由飞行";
     }
     void ClampPosition(Rectangle area)
     {

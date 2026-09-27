@@ -2,7 +2,7 @@
 
 Windows 10/11 x64 独立桌宠，放在 `FlyPet/`，与原来的 `FlyBrain/`、总界面和其他分区分开。双击 `dist/FlyPet.exe` 即可使用；便携 EXE 自带 .NET 运行时，正常运行无需 Python、联网或 GPU。
 
-首次打开启动菜单可选择放飞。以后所有操作都在右下角托盘图标右键菜单：投放糖、苍蝇拍、普通鼠标、显示状态条、无敌模式、立即复活、大脑活动图、神经连接证据、设置、隐藏和退出。没有左下角控制条。托盘图标悬停文字显示生命与饱腹百分比。糖和苍蝇在普通模式下允许鼠标穿透；拍子模式拦截工作区域的左键以免误操作下层窗口，按 Esc 退出工具模式。
+首次打开启动菜单可选择放飞。以后所有操作都在右下角托盘图标右键菜单：投放糖、显示状态条、无敌模式、立即复活、大脑活动图、神经连接证据、设置、隐藏和退出。没有左下角控制栏，也没有苍蝇拍切换模式。苍蝇一直把靠近的鼠标当作威胁并躲避；普通桌面点击穿透，直接点到苍蝇时才会击中它。托盘图标悬停文字显示生命与饱腹百分比。
 
 生命降到零后，苍蝇会变成自己绘制的低多边形血污泥与断翅，随机等待 12–40 秒复活；托盘的“立即复活”跳过等待。无敌模式下拍打仍会让它短暂警觉、加速逃跑，但不扣血。被击中后的较小速度增益持续到下一次复活。飞行消耗额外饱腹值；饱腹度、糖、威胁和休息共同影响感觉输入及飞行欲望。屏幕边缘会变成视觉输入和向内的目标方向，最后仍有物理边界钳制保证桌宠不飞出屏幕。它会短暂停歇，振翅停止。绘制目标 90 FPS，可在 20–120 FPS 间调整。
 
@@ -33,6 +33,6 @@ cd 'E:\Workspace2\project2(brain)'
 
 设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
-现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`swatter`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`status.json` 定期写到设置目录。
+现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 
 重新编译：安装 .NET 8 SDK，在 `FlyPet/` 运行 `./build.ps1`，会生成独立便携的 `dist/FlyPet.exe`。若需重新从原始缓存提取回路，先运行 `..\FlyBrain\.venv\Scripts\python.exe tools\extract_circuit.py`。`dotnet bin/Release/net8.0-windows/FlyPet.dll --self-test test-results` 可做逻辑、外观和纯计算性能检查。当前本机 Release 自测 21 项通过，纯模拟 30 秒约 0.2 秒，几何绘制平均约 1 ms/帧；这是计算基准，不等同于 Windows 桌面实际 FPS。运行时 `status.json` 提供实测 FPS 与实时率。每次只在选定显示器工作区域内生活；安全桌面、锁屏与独占全屏不保证置顶。错误日志在 `%LOCALAPPDATA%\FlyPet\error.log`。

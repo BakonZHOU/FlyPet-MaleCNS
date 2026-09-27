@@ -14,7 +14,7 @@ public sealed class PetApplication : ApplicationContext
     public Simulation Sim {get;}
     public Rectangle Area => Screen.AllScreens[Math.Min(Settings.MonitorIndex,Screen.AllScreens.Length-1)].WorkingArea;
     public ToolMode Mode {get;private set;}
-    public string ModeLabel=>Mode switch{ToolMode.Sugar=>"投糖模式 · 点击桌面放置一粒糖",ToolMode.Swatter=>"苍蝇拍模式 · 点击拍打（拦截点击）",_=>"普通模式 · 鼠标穿透"};
+    public string ModeLabel=>Mode==ToolMode.Sugar?"投糖模式 · 点击桌面放置一粒糖":"普通模式 · 始终躲避鼠标";
     public bool Paused {get;private set;}
     bool visible,disposing;
     public double ComputeMs {get;private set;}
@@ -55,8 +55,7 @@ public sealed class PetApplication : ApplicationContext
         var menu=new ContextMenuStrip();menu.Items.Add("显示 / 隐藏桌宠",null,(_,_)=>ToggleVisible());
         menu.Items.Add("启动菜单",null,(_,_)=>ShowDashboard());menu.Items.Add("大脑活动图…",null,(_,_)=>ShowBrainMap());menu.Items.Add("神经连接证据…",null,(_,_)=>ShowEvidence());menu.Items.Add("设置…",null,(_,_)=>ShowSettings());menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("投放糖",null,(_,_)=>{StartPet();SetMode(ToolMode.Sugar);});
-        menu.Items.Add("苍蝇拍",null,(_,_)=>{StartPet();SetMode(ToolMode.Swatter);});
-        menu.Items.Add("普通鼠标",null,(_,_)=>SetMode(ToolMode.Normal));menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
+        menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
         var meterItem=new ToolStripMenuItem("显示状态条"){Checked=Settings.ShowMeters,CheckOnClick=true};meterItem.CheckedChanged+=(_,_)=>{Settings.ShowMeters=meterItem.Checked;Settings.Save();};menu.Items.Add(meterItem);
         var invincibleItem=new ToolStripMenuItem("无敌模式"){Checked=Settings.Invincible,CheckOnClick=true};invincibleItem.CheckedChanged+=(_,_)=>{Settings.Invincible=invincibleItem.Checked;Settings.Save();};menu.Items.Add(invincibleItem);
         menu.Items.Add("立即复活",null,(_,_)=>Sim.Revive(Area));
@@ -102,7 +101,7 @@ public sealed class PetApplication : ApplicationContext
             case "hide":if(visible)ToggleVisible();break;
             case "pause":Paused=true;SetMode(ToolMode.Normal);break;
             case "resume":Paused=false;break;
-            case "swatter":StartPet();SetMode(ToolMode.Swatter);break;
+            case "swatter":StartPet();SetMode(ToolMode.Normal);break; // compatibility alias; there is no swatter mode now
             case "sugar-mode":StartPet();SetMode(ToolMode.Sugar);break;
             case "normal":SetMode(ToolMode.Normal);break;
             case "drop":Sim.AddSugar(PointArg());break;
@@ -135,10 +134,13 @@ public sealed class PetApplication : ApplicationContext
     bool OnMouseDown(Point p)
     {
         // Hook returns immediately. Work is deferred to the normal event loop; no synchronous rendering or I/O.
-        if(!visible||Paused||Mode==ToolMode.Normal)return false;
+        if(!visible||Paused)return false;
         if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p)))return false;
         if(tray.ContextMenuStrip?.Visible==true||!Area.Contains(p))return false;
-        pendingClick=p;pendingMode=Mode;return true;
+        if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Settings.PetSize*.55f+18)
+        {pendingClick=p;pendingMode=ToolMode.Swatter;return true;}
+        if(Mode==ToolMode.Sugar){pendingClick=p;pendingMode=ToolMode.Sugar;return true;}
+        return false;
     }
     void Tick(object? sender,EventArgs e)
     {
@@ -155,7 +157,7 @@ public sealed class PetApplication : ApplicationContext
             // A short accumulator handles variable UI frame intervals. Resume from sleep never fast-forwards death.
             accumulator+=Math.Min(elapsed,.20);
             var mouse=Control.MousePosition;
-            while(accumulator>=1.0/120){Sim.Update(1f/120,Area,new(mouse.X,mouse.Y),Mode==ToolMode.Swatter);accumulator-=1.0/120;advanced+=1f/120;}
+            while(accumulator>=1.0/120){Sim.Update(1f/120,Area,new(mouse.X,mouse.Y),visible);accumulator-=1.0/120;advanced+=1f/120;}
         }
         else accumulator=0;
         cost.Stop();ComputeMs=ComputeMs*.94+cost.Elapsed.TotalMilliseconds*.06;simulatedWindow+=advanced;

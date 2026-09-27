@@ -3,4 +3,5 @@ obj/
 dist/
 test-results/
 test-results-tuned*/
+test-results-cursor*/
 *.user
