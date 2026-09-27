@@ -33,7 +33,7 @@ cd 'E:\Workspace2\project2(brain)'
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`AlbinoChance`、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 1.6，约一小时量级）、`FlightFullnessCostPerSecond`、`AlarmSeconds`、`AlbinoChance`（默认 0.1）、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 

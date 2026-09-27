@@ -64,7 +64,7 @@ public sealed class PetApplication : ApplicationContext
         menu.Items.Add("重新加载配置",null,(_,_)=>ReloadSettings());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("退出 FlyPet",null,(_,_)=>ExitThread());
         tray=new NotifyIcon{Icon=icon,Text="FlyPet · 果蝇桌宠",ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(_,_)=>ShowDashboard();
         mouseHook=new(OnMouseDown);
-        Native.timeBeginPeriod(1);timer.Interval=8;timer.Tick+=Tick;timer.Start();
+        Native.timeBeginPeriod(1);timer.Interval=TimerInterval();timer.Tick+=Tick;timer.Start();
         if(quiet||!Settings.ShowLaunchMenu)StartPet();else ShowDashboard();
         if(Settings.LoadWarning!=null)tray.ShowBalloonTip(5000,"FlyPet",Settings.LoadWarning,ToolTipIcon.Warning);
     }
@@ -131,8 +131,9 @@ public sealed class PetApplication : ApplicationContext
     }
     public void TogglePause(){Paused=!Paused;if(Paused)SetMode(ToolMode.Normal);}
     public void SetMode(ToolMode mode){Mode=mode;if(mode==ToolMode.Normal)cursor.Hide();}
-    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;Sim.Recenter(Area);while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);}
-    void ReloadSettings(){Settings=Settings.Load();Sim.Settings=Settings;if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
+    int TimerInterval()=>Math.Clamp((int)Math.Round(1000d/Math.Max(1,Settings.FramesPerSecond)),1,50);
+    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);}
+    void ReloadSettings(){Settings=Settings.Load();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
     bool OnMouseDown(Point p)
     {
         // Hook returns immediately. Work is deferred to the normal event loop; no synchronous rendering or I/O.

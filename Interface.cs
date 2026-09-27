@@ -174,7 +174,9 @@ public sealed class SettingsWindow : Form
         rest=Check("允许停歇",s.RestEnabled);
         scroll.Controls.Add(Theme.Label("饱腹 100 = 吃饱，0 = 饥饿；飞行会额外消耗。\n感觉编码与身体解码是工程模型，不是活体参数。",8,y+6,550,84,9,Theme.Muted));
         Controls.Add(Theme.Button("应用设置",22,555,180,Apply,true));Controls.Add(Theme.Button("打开配置目录",218,555,185,()=>Process.Start(new ProcessStartInfo(Settings.Folder){UseShellExecute=true})));
-        Controls.Add(Theme.Button("关闭",419,555,205,Close));
+        // Closing the settings window commits the edited values as well, so an accidental
+        // click on the window X cannot make a change appear to be ignored.
+        Controls.Add(Theme.Button("关闭",419,555,205,Apply));
         Controls.Add(Theme.Label("修改 JSON 后从托盘选择「重新加载配置」。",24,615,590,26,9,Theme.Muted));ResumeLayout(false);
     }
     void Apply()

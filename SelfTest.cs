@@ -15,6 +15,7 @@ static class SelfTest
         var data=CircuitData.Load();var area=new Rectangle(0,0,1920,1080);var mouse=new Vector2(-5000,-5000);
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
+        var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance});
         Check("real_connectome_loaded",data.Nodes.Length==1800&&data.Edges.Length>100000,new{neurons=data.Nodes.Length,edges=data.Edges.Length});
         (float turn,float opto) ProbeTurn(float turn){var b=new Brain(data);var s=new Settings();b.SetInput(0,0,20,turn,.95f,0,s);for(int i=0;i<2000;i++)b.Step(1);return (b.Turn,b.OptomotorTurn);}
         var rightProbe=ProbeTurn(1);var leftProbe=ProbeTurn(-1);var centerProbe=ProbeTurn(0);
