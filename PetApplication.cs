@@ -54,7 +54,7 @@ public sealed class PetApplication : ApplicationContext
         }
         dashboard.Icon=icon;
         var menu=new ContextMenuStrip();menu.Items.Add("显示 / 隐藏桌宠",null,(_,_)=>ToggleVisible());
-        menu.Items.Add("启动菜单",null,(_,_)=>ShowDashboard());menu.Items.Add("大脑活动图…",null,(_,_)=>ShowBrainMap());menu.Items.Add("设置…",null,(_,_)=>ShowSettings());menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("启动菜单",null,(_,_)=>Defer(ShowDashboard));menu.Items.Add("大脑活动图…",null,(_,_)=>Defer(ShowBrainMap));menu.Items.Add("设置…",null,(_,_)=>Defer(ShowSettings));menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("投放糖",null,(_,_)=>{StartPet();SetMode(ToolMode.Sugar);});
         menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
         var meterItem=new ToolStripMenuItem("显示状态条"){Checked=Settings.ShowMeters,CheckOnClick=true};meterItem.CheckedChanged+=(_,_)=>{Settings.ShowMeters=meterItem.Checked;Settings.Save();};menu.Items.Add(meterItem);
@@ -68,7 +68,8 @@ public sealed class PetApplication : ApplicationContext
         if(quiet||!Settings.ShowLaunchMenu)StartPet();else ShowDashboard();
         if(Settings.LoadWarning!=null)tray.ShowBalloonTip(5000,"FlyPet",Settings.LoadWarning,ToolTipIcon.Warning);
     }
-    public void ShowDashboard(){dashboard.Show();dashboard.WindowState=FormWindowState.Normal;dashboard.Activate();}
+    void Defer(Action action){if(dashboard.IsHandleCreated)dashboard.BeginInvoke(action);else action();}
+    public void ShowDashboard(){dashboard.Show();dashboard.WindowState=FormWindowState.Normal;dashboard.BringToFront();dashboard.Activate();}
     public void ShowEvidence(){SetMode(ToolMode.Normal);if(evidenceWindow==null||evidenceWindow.IsDisposed)evidenceWindow=new(this);evidenceWindow.Show();evidenceWindow.Activate();}
     public void ShowBrainMap(){SetMode(ToolMode.Normal);if(brainMap==null||brainMap.IsDisposed)brainMap=new(this);brainMap.Show();brainMap.Activate();}
     public CausalAudit RunCausalAudit()
@@ -121,7 +122,7 @@ public sealed class PetApplication : ApplicationContext
         }
         return new{ok=true,visible,paused=Paused,mode=Mode.ToString(),health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,x=Sim.Position.X,y=Sim.Position.Y,fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,area=new{Area.X,Area.Y,Area.Width,Area.Height}};
     }
-    public void ShowSettings(){SetMode(ToolMode.Normal);if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new(this);settingsWindow.Show();settingsWindow.Activate();}
+    public void ShowSettings(){SetMode(ToolMode.Normal);if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new(this);settingsWindow.Show();settingsWindow.WindowState=FormWindowState.Normal;settingsWindow.BringToFront();settingsWindow.Activate();}
     public void StartPet(){visible=true;Paused=false;pet.Show();}
     public void ToggleVisible()
     {

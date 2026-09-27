@@ -4,6 +4,7 @@ namespace FlyPet;
 
 public sealed class Settings
 {
+    public int SchemaVersion { get; set; } = 3;
     public int FramesPerSecond { get; set; } = 90;
     public int PetSize { get; set; } = 90;
     public float FlightSpeed { get; set; } = 400;
@@ -29,7 +30,7 @@ public sealed class Settings
     public bool NeuralSteering { get; set; } = true;
     public bool RestEnabled { get; set; } = true;
     public bool StartWithWindows { get; set; }
-    public bool ShowLaunchMenu { get; set; } = true;
+    public bool ShowLaunchMenu { get; set; }
     public bool PauseWhenHidden { get; set; } = true;
     public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FlyPet");
     public static string FileName => Path.Combine(Folder, "settings.json");
@@ -46,6 +47,7 @@ public sealed class Settings
             if(exists&&!doc!.RootElement.TryGetProperty(nameof(FlightFullnessCostPerSecond),out _))
             {s.PetSize=90;s.FlightSpeed=400;s.HungerPerMinute=1.6f;s.FlightFullnessCostPerSecond=.02f;s.StarvationDamagePerSecond=.35f;s.FramesPerSecond=90;s.ShowMeters=false;changed=true;}
             if(exists&&!doc!.RootElement.TryGetProperty(nameof(AlbinoChance),out _)){s.AlbinoChance=.04f;s.AlbinoSpeedMultiplier=1.55f;changed=true;}
+            if(exists&&!doc!.RootElement.TryGetProperty(nameof(SchemaVersion),out _)){s.SchemaVersion=3;s.ShowLaunchMenu=false;changed=true;}
             if(changed)s.Save();
             s.Validate(); return s;
         }

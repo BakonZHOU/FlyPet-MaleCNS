@@ -132,7 +132,7 @@ public sealed class SettingsWindow : Form
     readonly ComboBox monitor;
     public SettingsWindow(PetApplication app)
     {
-        this.app=app;Theme.Form(this);Text="FlyPet · 设置";ClientSize=new(650,660);MinimumSize=new(650,660);StartPosition=FormStartPosition.CenterScreen;
+        this.app=app;Theme.Form(this);Text="FlyPet · 设置";ClientSize=new(650,660);MinimumSize=new(650,660);StartPosition=FormStartPosition.CenterScreen;TopMost=true;
         Controls.Add(Theme.Label("按你的节奏生活。",24,22,560,38,19,Theme.Accent));
         Controls.Add(Theme.Label("应用后立即生效。高级参数保存在本地 JSON 中。",26,67,580,25,10,Theme.Muted));
         var scroll=new Panel{Location=new(20,105),Size=new(610,430),AutoScroll=true,Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom};Controls.Add(scroll);
