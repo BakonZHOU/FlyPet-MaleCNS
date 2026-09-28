@@ -11,7 +11,7 @@ from scipy.sparse import load_npz
 
 root = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
-parser.add_argument('--max-neurons', type=int, default=1800)
+parser.add_argument('--max-neurons', type=int, default=16711)
 args = parser.parse_args()
 n = pd.read_parquet(root / 'FlyBrain/cache/neurons.parquet')
 import pyarrow.feather as feather
@@ -20,6 +20,8 @@ locations = {int(row['bodyId']): row['somaLocation'] for row in feather.read_tab
     columns=['bodyId', 'somaLocation']).to_pylist()}
 w = load_npz(root / 'FlyBrain/cache/W_post_pre.npz').tocsr()
 t = n.type.fillna('')
+c = n['class'].fillna('')
+superclass = n.superclass.fillna('')
 sweet = set(pd.read_csv(root / 'FlyBrain/flybrain/data/taste_grns.csv').query("taste == 'sweet'").bodyId)
 groups = {
     'visual': t.isin(['LC4', 'LPLC2']),
@@ -31,8 +33,32 @@ groups = {
     'wing': t.str.startswith(('DLMn', 'DVMn')),
     'taste': n.bodyId.isin(sweet),
     'feed': t.eq('MN9'),
+    # Broader circuits used by the learned desktop behaviour. These labels come
+    # from the MaleCNS annotation table and remain attached to every selected cell.
+    'visual_motion': c.eq('visual'),
+    'olfactory': c.isin(['olfactory', 'ALPN', 'ALLN', 'ALIN', 'ALON']),
+    'memory': c.isin(['Kenyon_Cell', 'MBON']),
+    'reward': c.eq('DAN') | t.str.startswith(('PAM', 'PPL')),
+    'navigation': c.eq('CX'),
+    'descending': superclass.eq('descending_neuron'),
+    'motor': superclass.isin(['vnc_motor', 'cb_motor']),
+    'gustatory': c.eq('gustatory'),
 }
-seed = np.flatnonzero(np.logical_or.reduce(list(groups.values())))
+
+# Keep substantial, balanced populations from each requested functional system.
+# Ranking by annotated input count avoids making a single large class consume the
+# whole budget, while the second pass restores the strongest cross-system partners.
+quotas = {'visual_motion': 2400, 'olfactory': 2200, 'memory': 3200, 'reward': 500,
+          'navigation': 2600, 'descending': 1400, 'motor': 900, 'gustatory': 900}
+seed_masks = [groups[k] for k in ['visual','escape','flight','steer','optomotor','reverse','wing','taste','feed']]
+connectivity = n.in_syn.fillna(0).to_numpy()
+for name, limit in quotas.items():
+    ids = np.flatnonzero(groups[name].to_numpy())
+    ids = ids[np.argsort(-connectivity[ids], kind='stable')[:limit]]
+    chosen = np.zeros(len(n), dtype=bool); chosen[ids] = True; seed_masks.append(chosen)
+seed = np.flatnonzero(np.logical_or.reduce(seed_masks))
+if len(seed) > args.max_neurons:
+    raise ValueError(f'Functional seeds ({len(seed)}) exceed --max-neurons ({args.max_neurons})')
 # Rank one-hop partners by raw absolute synapse counts, preserving all functional seeds.
 score = np.asarray(abs(w[:, seed]).sum(axis=1)).ravel() + np.asarray(abs(w[seed, :]).sum(axis=0)).ravel()
 score[seed] = 0
@@ -49,8 +75,8 @@ for i in selected:
 edges = [[int(pre), int(post), int(count)] for post, pre, count in zip(sub.row, sub.col, sub.data) if count != 0]
 result = {'source': 'MaleCNS v1.0 via local FlyBrain compiled cache',
           'sourceUrl': 'https://male-cns.janelia.org/download/',
-          'selection': 'All functional seeds + strongest one-hop partners by absolute synapse count; induced subgraph.',
-          'notes': 'Cached signs include FlyBrain NT assumptions. No receptor correction. Runtime weights are capped and normalized; sensory drives and decoder are engineered, not validated biology.',
+          'selection': 'Balanced annotated visual, olfactory, mushroom-body/reward, central-complex, descending, motor and gustatory populations + legacy functional seeds + strongest one-hop partners; induced subgraph.',
+          'notes': 'Cached signs include FlyBrain NT assumptions. No receptor correction. Runtime weights are capped and normalized; sensory drives, plastic place coding and decoder are engineered biological hypotheses, not validated whole-animal physiology.',
           'cacheSha256': hashlib.sha256((root/'FlyBrain/cache/neurons.parquet').read_bytes()).hexdigest(),
           'nodes': nodes, 'edges': edges}
 out = root / 'FlyPet/Assets/circuit.json'

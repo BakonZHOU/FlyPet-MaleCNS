@@ -6,6 +6,8 @@ public sealed class Sugar(Vector2 position)
 {
     public Vector2 Position=position;
     public float Amount=100,Age;
+    public bool Consumed {get;private set;}
+    public bool TryConsume(){if(Consumed)return false;Consumed=true;Amount=0;return true;}
 }
 
 public sealed class Simulation
@@ -24,7 +26,8 @@ public sealed class Simulation
     public readonly List<Sugar> Sugars=[];
     readonly Random random;
     Vector2 wander;
-    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown;
+    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown,edgeShock,rewardPulse,punishmentPulse;
+    public int EdgeCollisions {get;private set;}
     public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);RollSkin();Health=MaxHealth;}
     public void Recenter(Rectangle area){Position=new(area.Left+area.Width*.55f,area.Top+area.Height*.45f);wander=Position;Velocity=Vector2.Zero;}
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
@@ -42,23 +45,31 @@ public sealed class Simulation
     public void CleanRemains(){if(Dead){RemainsVisible=false;DeathRemaining=0;Behavior="已清理";}}
     public void Revive(Rectangle area)
     {
-        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=0;Brain.Reset();Recenter(area);
+        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=edgeShock=rewardPulse=punishmentPulse=0;Brain.Reset();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
     public void Update(float dt,Rectangle area,Vector2 mouse,bool cursorThreat)
     {
         Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;
+        edgeShock=Math.Max(0,edgeShock-dt*2.5f);rewardPulse=Math.Max(0,rewardPulse-dt*.7f);punishmentPulse=Math.Max(0,punishmentPulse-dt*1.2f);
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         Alarm=Math.Max(0,Alarm-dt/Settings.AlarmSeconds);
         Fullness=Math.Max(0,Fullness-Settings.HungerPerMinute/60*dt-(Grounded?0:Settings.FlightFullnessCostPerSecond)*Brain.Flight*dt);
         if(Fullness<=.01f&&!Settings.Invincible){Health=Math.Max(0,Health-Settings.StarvationDamagePerSecond*dt);if(Dead){Die("饥饿死亡");return;}}
         foreach(var sugar in Sugars)sugar.Age+=dt;
-        Sugars.RemoveAll(s=>s.Amount<=0||s.Age>600);
+        Sugars.RemoveAll(s=>s.Consumed||s.Amount<=0||s.Age>600);
         Sugar? food=null;float foodDist=float.MaxValue;
-        foreach(var s in Sugars){float d=Vector2.Distance(Position,s.Position);if(d<foodDist&&d<Settings.SugarAttractionRadius){foodDist=d;food=s;}}
+        Vector2 odorVector=Vector2.Zero;float odorStrength=0;
+        foreach(var s in Sugars)
+        {
+            var offset=s.Position-Position;float d=Math.Max(1,offset.Length());
+            if(d<foodDist){foodDist=d;food=s;}
+            if(d<Settings.SugarAttractionRadius){float signal=1-d/Settings.SugarAttractionRadius;signal*=signal;odorVector+=offset/d*signal;odorStrength+=signal;}
+        }
+        odorStrength=Math.Clamp(odorStrength,0,1);if(odorVector.LengthSquared()>1)odorVector=Vector2.Normalize(odorVector);
         float mouseDist=Vector2.Distance(mouse,Position);
         float threat=cursorThreat?Math.Clamp(1-mouseDist/Settings.FearRadius,0,1):0;
-        bool eating=food!=null&&foodDist<65&&Fullness<100&&threat<.08f;
+        bool contact=food!=null&&foodDist<65&&Fullness<100&&threat<.08f;
         wanderRemaining-=dt;
         if(wanderRemaining<=0||Vector2.Distance(Position,wander)<32)
         {
@@ -66,54 +77,68 @@ public sealed class Simulation
             wander=new(area.Left+margin+(float)random.NextDouble()*Math.Max(1,area.Width-2*margin),area.Top+margin+(float)random.NextDouble()*Math.Max(1,area.Height-2*margin));
             wanderRemaining=2+(float)random.NextDouble()*3;
         }
-        Vector2 target=(food!=null&&Fullness<100)?food.Position:wander;
+        bool recalling=Fullness<90&&odorStrength<.04f&&Brain.MemoryConfidence>.035f;
+        Vector2 remembered=new(area.Left+Brain.RememberedX*area.Width,area.Top+Brain.RememberedY*area.Height);
+        Vector2 target=recalling?remembered:wander;
         Vector2 desired=target-Position;
-        if(threat>.02f){desired=Position-mouse;if(desired.LengthSquared()<1)desired=new(1,-1);}
-        float wall=0;
+        Vector2 avoided=new(area.Left+Brain.AvoidedX*area.Width,area.Top+Brain.AvoidedY*area.Height),learnedAway=Position-avoided;
+        float avoidanceRange=Math.Min(area.Width,area.Height)*.38f;
+        bool avoidingMemory=Brain.AvoidanceConfidence>.02f&&learnedAway.LengthSquared()<avoidanceRange*avoidanceRange;
+        if(avoidingMemory&&learnedAway.LengthSquared()>.01f)desired+=Vector2.Normalize(learnedAway)*avoidanceRange*Brain.AvoidanceConfidence*2.5f;
+        Vector2 away=Position-mouse;if(away.LengthSquared()<1)away=new(1,-1);
+        float wall=0,wallTurn=0;
         if(Settings.EdgeSensing)
         {
             float margin=Math.Min(170,Math.Min(area.Width,area.Height)*.30f);
             float left=Math.Clamp((margin-(Position.X-area.Left))/margin,0,1),right=Math.Clamp((margin-(area.Right-Position.X))/margin,0,1);
             float top=Math.Clamp((margin-(Position.Y-area.Top))/margin,0,1),bottom=Math.Clamp((margin-(area.Bottom-Position.Y))/margin,0,1);
             wall=Math.Max(Math.Max(left,right),Math.Max(top,bottom));
-            desired+=new Vector2(left-right,top-bottom)*wall*1200;
+            var inward=new Vector2(left-right,top-bottom);if(inward.LengthSquared()>.0001f)wallTurn=Wrap(MathF.Atan2(inward.Y,inward.X)+MathF.PI/2-Heading);
         }
         float targetHeading=MathF.Atan2(desired.Y,desired.X)+MathF.PI/2;
         float delta=Wrap(targetHeading-Heading);
+        float threatHeading=MathF.Atan2(away.Y,away.X)+MathF.PI/2;
+        float threatTurn=Wrap(threatHeading-Heading);
+        float odorTurn=0;if(odorVector.LengthSquared()>.0001f)odorTurn=Wrap(MathF.Atan2(odorVector.Y,odorVector.X)+MathF.PI/2-Heading);
         if(Settings.RestEnabled&&Grounded&&RestRemaining>0)RestRemaining-=dt;
-        if(Settings.RestEnabled&&!Grounded&&flightDuration>10&&Fullness>27&&food==null&&threat<.02f&&Alarm<.01f)
+        if(Settings.RestEnabled&&!Grounded&&flightDuration>10&&Fullness>27&&odorStrength<.02f&&threat<.02f&&Alarm<.01f)
         {RestRemaining=1+(float)random.NextDouble()*2.5f;flightDuration=0;}
         bool resting=Settings.RestEnabled&&RestRemaining>0&&threat<.02f&&Alarm<.01f;
-        float travel=eating||resting?0:.95f;
-        Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),eating?1:0,Fullness,Math.Clamp(delta,-1,1),travel,wall,Settings);
+        float travel=contact||resting?0:.95f;
+        float px=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),py=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
+        Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),contact?1:0,Fullness,Math.Clamp(threat>.02f?threatTurn:delta,-1,1),travel,wall,Settings,
+            odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt);
         neuralRemainder+=dt;
         while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain);neuralRemainder-=.001f;}
-        if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!eating&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
-        float turnRate=Settings.NeuralSteering?Brain.OptomotorTurn*6.5f+Brain.Turn*1.2f:Math.Clamp(delta,-1,1)*6.5f;
-        if(food!=null&&threat<.02f)turnRate=Math.Clamp(delta,-1,1)*9f+Brain.OptomotorTurn*1.5f;
-        if(wall>.08f)turnRate+=Math.Clamp(delta,-1,1)*7.5f;
+        if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!contact&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
+        float turnRate=Settings.NeuralSteering
+            ? Brain.OptomotorTurn*3.8f+Brain.Turn*.9f+Brain.OdorTurn*5.6f+Brain.NavigationTurn*2.4f+Brain.DescendingTurn*1.8f+Math.Clamp(delta,-1,1)*.75f
+            : Math.Clamp(threat>.02f?threatTurn:odorStrength>.02f?odorTurn:delta,-1,1)*6.5f;
         Heading=Wrap(Heading+turnRate*dt);
         float neuralSpeed=Math.Clamp(Brain.Flight*(1.25f+Brain.WingRate*.006f),0,1.8f);
         float speed=Settings.FlightSpeed*neuralSpeed*(Albino?Settings.AlbinoSpeedMultiplier:1)*(1+Brain.Fear*1.8f+InjuryArousal*.22f);
         if(burstRemaining>0)speed*=2.2f;
-        if(food!=null&&threat<.02f)speed*=Math.Clamp(foodDist/110,.65f,1);
-        if(eating||resting)speed=0;
+        if(contact||resting)speed=0;
         Grounded=speed<3&&Velocity.Length()<4;
         if(Grounded)flightDuration=0;else flightDuration+=dt;
         var direction=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));
-        Velocity=Vector2.Lerp(Velocity,direction*speed,1-MathF.Exp(-8*dt));Position+=Velocity*dt;ClampPosition(area);
-        if(eating)
+        Velocity=Vector2.Lerp(Velocity,direction*speed,1-MathF.Exp(-8*dt));Position+=Velocity*dt;
+        bool collided=ClampPosition(area);
+        if(collided){edgeShock=1;punishmentPulse=1;Alarm=Math.Max(Alarm,.45f);RestRemaining=0;EdgeCollisions++;}
+        bool ate=false;
+        if(contact&&Brain.Feeding>.02f&&food!.TryConsume())
         {
-            float amount=Math.Min(food!.Amount,Math.Min(100-Fullness,Settings.FeedPerSecond*Brain.Feeding*dt));
-            Fullness+=amount;food.Amount-=amount;Health=Math.Min(100,Health+amount*.3f);
+            float amount=Math.Min(100-Fullness,Settings.SugarNutrition);Fullness+=amount;Health=Math.Min(MaxHealth,Health+amount*.3f);rewardPulse=1;ate=true;Sugars.Remove(food);
         }
-        Behavior=threat>.02f||Brain.Fear>.2f?"逃离鼠标":eating?"吃糖":Grounded?"停歇":food!=null&&Fullness<90?"寻找糖粒":wall>.25f?"避开屏幕边缘":"自由飞行";
+        Behavior=collided?"撞击边缘并记住":threat>.02f||Brain.Fear>.2f?"逃离鼠标":ate?"吃掉糖粒并记住":Grounded?"停歇":odorStrength>.02f&&Fullness<95?"循着糖味":recalling?"回忆常见糖点":avoidingMemory?"避开负面位置":wall>.25f?"视觉避开边缘":"自由飞行";
     }
-    void ClampPosition(Rectangle area)
+    bool ClampPosition(Rectangle area)
     {
         float margin=Math.Min(Settings.PetSize*.32f,Math.Min(area.Width,area.Height)*.2f);
         var old=Position;Position=new(Math.Clamp(Position.X,area.Left+margin,area.Right-margin),Math.Clamp(Position.Y,area.Top+margin,area.Bottom-margin));
-        if(old!=Position){Velocity*=.25f;wanderRemaining=0;}
+        if(old==Position)return false;
+        var normal=Position-old;if(normal.LengthSquared()>.001f){normal=Vector2.Normalize(normal);Velocity=Vector2.Reflect(Velocity,normal)*.42f;Heading=MathF.Atan2(normal.Y,normal.X)+MathF.PI/2;}else Velocity*=.25f;
+        wanderRemaining=0;return true;
     }
     static float Wrap(float a){while(a>MathF.PI)a-=MathF.Tau;while(a< -MathF.PI)a+=MathF.Tau;return a;}
 }

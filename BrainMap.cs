@@ -41,7 +41,7 @@ public sealed class BrainMapWindow : Form
         if(IsDisposed||!Visible||clock.Elapsed.TotalSeconds-lastSample<.1)return;
         lastSample=clock.Elapsed.TotalSeconds;timeline.Record();map.Invalidate();timeline.Invalidate();
         if(selected>=0)UpdateDetails();
-        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n胞体坐标 {(app.Circuit.Nodes.Count(n=>n.Soma?.Length==3)):N0} 个\n外界输入：视觉 {b.VisualRate:0.0} Hz，甜味 {b.TasteRate:0.0} Hz\n身体输出：飞行 {b.Flight:0.00}，转向 {b.OptomotorTurn:+0.00;-0.00;0.00}";
+        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n胞体坐标 {(app.Circuit.Nodes.Count(n=>n.Soma?.Length==3)):N0} 个\n视觉 {b.VisualRate:0.0} Hz · 嗅觉 {b.OlfactoryRate:0.0} Hz\n记忆置信 {b.MemoryConfidence:0.00} · 奖励 {b.RewardSignal:+0.00;-0.00;0.00}";
     }
     void UpdateDetails()
     {
@@ -74,6 +74,12 @@ public sealed class SomaMap : Control
     }
     static Color GroupColor(string[] groups)
     {
+        if(groups.Contains("reward"))return Color.FromArgb(234,104,146);
+        if(groups.Contains("memory"))return Color.FromArgb(218,170,72);
+        if(groups.Contains("olfactory"))return Color.FromArgb(112,205,126);
+        if(groups.Contains("navigation"))return Color.FromArgb(91,197,205);
+        if(groups.Contains("descending"))return Color.FromArgb(224,89,68);
+        if(groups.Contains("motor"))return Color.FromArgb(84,139,222);
         if(groups.Contains("visual"))return Color.FromArgb(175,193,100);
         if(groups.Contains("taste"))return Color.FromArgb(210,177,87);
         if(groups.Contains("escape"))return Color.FromArgb(227,73,58);
@@ -110,7 +116,7 @@ public sealed class SomaMap : Control
             if(i==Selected){using var ring=new Pen(Theme.Text,1.5f);g.DrawEllipse(ring,x-8,y-8,16,16);}
         }
         using var legend=new Font("Consolas",8);using var legendBrush=new SolidBrush(Theme.Muted);
-        g.DrawString("视觉  甜味  逃逸  飞行/翅肌  转向  中间神经元",legend,legendBrush,13,Height-24);
+        g.DrawString("视觉  嗅觉  记忆/奖励  导航  下行/运动  甜味  中间神经元",legend,legendBrush,13,Height-24);
     }
 }
 
@@ -120,7 +126,7 @@ public sealed class ActivityTimeline : Control
     readonly float[,] values=new float[9,600];
     readonly SolidBrush[] palette;
     int head,count;
-    static readonly string[] names=["视觉","逃逸","飞行 DN","翅肌","甜味","进食 MN9","转向 DN","视动 DN","倒退 MDN"];
+    static readonly string[] names=["视觉","嗅觉","记忆","奖励","导航","逃逸","下行","运动","甜味"];
     public ActivityTimeline(PetApplication app)
     {
         this.app=app;DoubleBuffered=true;BackColor=Theme.Panel;
@@ -128,7 +134,7 @@ public sealed class ActivityTimeline : Control
     }
     public void Record()
     {
-        var b=app.Sim.Brain;float[] v=[b.VisualRate,b.EscapeRate,b.FlightRate,b.WingRate,b.TasteRate,b.FeedRate,Math.Abs(b.Turn)*80,b.OptomotorRate,b.ReverseRate];
+        var b=app.Sim.Brain;float[] v=[b.VisualRate,b.OlfactoryRate,b.MemoryRate,b.RewardRate,b.NavigationRate,b.EscapeRate,b.DescendingRate,b.MotorRate,b.TasteRate];
         for(int i=0;i<v.Length;i++)values[i,head]=Math.Clamp(v[i]/30,0,1);
         head=(head+1)%600;count=Math.Min(600,count+1);
     }

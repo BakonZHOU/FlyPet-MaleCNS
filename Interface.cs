@@ -79,7 +79,7 @@ public sealed class NeuralEvidenceWindow : Form
     {
         this.app=app;Theme.Form(this);Text="FlyPet · 神经连接证据";ClientSize=new(760,610);MinimumSize=new(760,610);StartPosition=FormStartPosition.CenterScreen;
         Controls.Add(Theme.Label("连接在运行，但行为不是纯生物学涌现。",26,22,700,40,19,Theme.Accent));
-        Controls.Add(Theme.Label("内置回路含 1,800 个 MaleCNS 神经元和 136,027 条连接。外界只写入视觉与甜味感觉群；飞行、转向和逃逸从下游群读取。当前缩减图未让 MN9 稳定放电，所以进食使用甜味 GRN 率作为公开的回退。血量、目标方向与复活仍是工程规则。",28,70,700,72,10,Theme.Muted));
+        Controls.Add(Theme.Label($"内置回路含 {app.Circuit.Nodes.Length:N0} 个 MaleCNS 神经元和 {app.Circuit.Edges.Length:N0} 条连接。外界刺激写入视觉、嗅觉、味觉与位置稀疏编码；飞行、导航、逃逸和运动从下游群读取。吃糖奖励与边缘撞击负反馈会修改蘑菇体位置记忆。血量与复活仍是工程规则。",28,70,700,72,10,Theme.Muted));
         Controls.Add(Theme.Label("实时群体活动（相对放电率）",28,158,500,30,12));
         bars=new EvidenceBars(app){Location=new(28,194),Size=new(420,224)};Controls.Add(bars);
         values=Theme.Label("",470,194,260,224,9,Theme.Muted);Controls.Add(values);
@@ -91,7 +91,7 @@ public sealed class NeuralEvidenceWindow : Form
     public void RefreshEvidence()
     {
         if(IsDisposed)return;var b=app.Sim.Brain;bars.Invalidate();
-        values.Text=$"视觉 LC4/LPLC2     {b.VisualRate,7:0.0} Hz\n逃逸 DNp01          {b.EscapeRate,7:0.0} Hz\n飞行 DNg02/DNa08    {b.FlightRate,7:0.0} Hz\n翅肌 DLMn/DVMn      {b.WingRate,7:0.0} Hz\n甜味 GRN            {b.TasteRate,7:0.0} Hz\nMN9（仅观察）       {b.FeedRate,7:0.0} Hz\n\n累计放电            {b.TotalSpikes,10:N0}";
+        values.Text=$"视觉回路            {b.VisualRate,7:0.0} Hz\n嗅觉回路            {b.OlfactoryRate,7:0.0} Hz\n蘑菇体记忆          {b.MemoryRate,7:0.0} Hz\n奖励 DAN            {b.RewardRate,7:0.0} Hz\n中央复合体导航      {b.NavigationRate,7:0.0} Hz\n下行 / 运动         {b.DescendingRate,7:0.0} / {b.MotorRate:0.0} Hz\n记忆置信            {b.MemoryConfidence,7:0.00}\n累计放电            {b.TotalSpikes,10:N0}";
     }
     async void RunAudit()
     {
@@ -114,7 +114,7 @@ public sealed class EvidenceBars : Control
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);var b=app.Sim.Brain;
-        var rows=new[]{("视觉输入",b.VisualRate,Color.FromArgb(184,177,102)),("逃逸",b.EscapeRate,Color.FromArgb(190,82,59)),("飞行",b.FlightRate,Color.FromArgb(116,157,184)),("翅肌",b.WingRate,Color.FromArgb(111,137,158)),("甜味输入",b.TasteRate,Color.FromArgb(194,166,99)),("进食",b.FeedRate,Color.FromArgb(133,174,103))};
+        var rows=new[]{("视觉输入",b.VisualRate,Color.FromArgb(184,177,102)),("嗅觉输入",b.OlfactoryRate,Color.FromArgb(112,205,126)),("记忆",b.MemoryRate,Color.FromArgb(218,170,72)),("奖励",b.RewardRate,Color.FromArgb(234,104,146)),("导航",b.NavigationRate,Color.FromArgb(91,197,205)),("下行运动",b.DescendingRate,Color.FromArgb(190,82,59))};
         using var label=Theme.Font(9);using var text=new SolidBrush(Theme.Text);using var track=new SolidBrush(Color.FromArgb(18,20,18));
         for(int i=0;i<rows.Length;i++)
         {
@@ -152,7 +152,6 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,1);
         Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,1);
         Num(nameof(s.AlarmSeconds),"受击后快速逃离持续秒数",.1m,10,(decimal)s.AlarmSeconds,1);
-        Num(nameof(s.FeedPerSecond),"进食速率（每秒）",1,100,(decimal)s.FeedPerSecond);
         Num(nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,1);
         Num(nameof(s.AlbinoChance),"白眼果蝇出现概率",0,1,(decimal)s.AlbinoChance,2);
         Num(nameof(s.AlbinoSpeedMultiplier),"白眼果蝇速度倍率",1,3,(decimal)s.AlbinoSpeedMultiplier,2);
@@ -161,6 +160,11 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.NeuralGain),"连接增益（0 可消融突触传播）",0,4,(decimal)s.NeuralGain,1);
         Num(nameof(s.SensoryGain),"感觉输入增益（0 可关闭输入）",0,4,(decimal)s.SensoryGain,1);
         Num(nameof(s.SugarAttractionRadius),"糖的吸引范围（像素）",100,10000,(decimal)s.SugarAttractionRadius);
+        Num(nameof(s.SugarNutrition),"每块糖恢复的饱腹值",1,100,(decimal)s.SugarNutrition);
+        Num(nameof(s.LearningRate),"奖励位置学习率",0,2,(decimal)s.LearningRate,2);
+        Num(nameof(s.MemoryDecayPerMinute),"位置记忆每分钟衰减",0,1,(decimal)s.MemoryDecayPerMinute,3);
+        Num(nameof(s.SugarReward),"吃糖奖励信号",0,2,(decimal)s.SugarReward,2);
+        Num(nameof(s.EdgePunishment),"撞击边缘负面信号",0,2,(decimal)s.EdgePunishment,2);
         Num(nameof(s.MaxSugar),"最多保留糖粒数",1,30,s.MaxSugar);
         scroll.Controls.Add(Theme.Label("桌宠所在显示器",8,y+4,300,32));
         monitor=new(){Location=new(335,y),Size=new(228,30),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};

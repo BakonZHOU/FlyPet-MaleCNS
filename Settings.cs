@@ -22,6 +22,11 @@ public sealed class Settings
     public float NeuralGain { get; set; } = 1;
     public float SensoryGain { get; set; } = 1;
     public float SugarAttractionRadius { get; set; } = 2200;
+    public float SugarNutrition { get; set; } = 32;
+    public float LearningRate { get; set; } = .18f;
+    public float MemoryDecayPerMinute { get; set; } = .002f;
+    public float SugarReward { get; set; } = 1;
+    public float EdgePunishment { get; set; } = .75f;
     public int MaxSugar { get; set; } = 12;
     public int MonitorIndex { get; set; } = 0;
     public bool ShowMeters { get; set; } = false;
@@ -70,6 +75,8 @@ public sealed class Settings
         RespawnMinSeconds = Safe(RespawnMinSeconds,1,3600,12); RespawnMaxSeconds = Safe(RespawnMaxSeconds,RespawnMinSeconds,7200,40);
         NeuralGain = Safe(NeuralGain,0,4,1); SensoryGain = Safe(SensoryGain,0,4,1);
         SugarAttractionRadius = Safe(SugarAttractionRadius,100,10000,2200); MaxSugar = Math.Clamp(MaxSugar,1,30);
+        SugarNutrition=Safe(SugarNutrition,1,100,32);LearningRate=Safe(LearningRate,0,2,.18f);MemoryDecayPerMinute=Safe(MemoryDecayPerMinute,0,1,.002f);
+        SugarReward=Safe(SugarReward,0,2,1);EdgePunishment=Safe(EdgePunishment,0,2,.75f);
         MonitorIndex = Math.Max(0, MonitorIndex);
     }
     public void Save()

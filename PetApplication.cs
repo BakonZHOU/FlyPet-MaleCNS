@@ -34,7 +34,7 @@ public sealed class PetApplication : ApplicationContext
     readonly LocalControl localControl;
     readonly System.Windows.Forms.Timer timer=new();
     readonly Stopwatch clock=Stopwatch.StartNew();
-    double previous,accumulator,statsPrevious,simulatedWindow,drawElapsed;
+    double previous,accumulator,statsPrevious,simulatedWindow,drawElapsed,nextStatusSave;
     int frameCounter;
     Point? pendingClick;
     ToolMode pendingMode;
@@ -42,7 +42,7 @@ public sealed class PetApplication : ApplicationContext
     public PetApplication(bool quiet)
     {
         Settings=Settings.Load();Directory.CreateDirectory(Settings.Folder);Circuit=CircuitData.Load();
-        Sim=new(Settings,Circuit);Sim.Recenter(Area);
+        Sim=new(Settings,Circuit);LoadMemory();Sim.Recenter(Area);
         pet=new(Settings.PetSize,"FlyPet · 苍蝇");cursor=new(84,"FlyPet · 工具指针");
         dashboard=new(this);
         _=dashboard.Handle;
@@ -177,7 +177,7 @@ public sealed class PetApplication : ApplicationContext
             double duration=now-statsPrevious;MeasuredFps=frameCounter/duration;RealTimeRatio=simulatedWindow/duration;frameCounter=0;simulatedWindow=0;statsPrevious=now;
             evidenceWindow?.RefreshEvidence();tray.Text=$"生命{Sim.Health:0}% 饱腹{Sim.Fullness:0}% · {(Settings.Invincible?"无敌":Sim.Behavior)}";
             if(Sim.ConsumeAlbinoAnnouncement())tray.ShowBalloonTip(6500,"FlyPet","出金了！是白眼果蝇！",ToolTipIcon.Info);
-            if(((int)now)%5==0)SaveStatus();
+            if(now>=nextStatusSave){nextStatusSave=now+5;SaveStatus();SaveMemory();}
         }
         UpdateDeathMenu(Control.MousePosition);
     }
@@ -222,11 +222,23 @@ public sealed class PetApplication : ApplicationContext
     }
     void SaveStatus()
     {
-        try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,feeding=Sim.Brain.Feeding},Settings.JsonOptions));}catch(IOException){}
+        try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,feeding=Sim.Brain.Feeding,olfactory=Sim.Brain.OlfactoryRate,memory=Sim.Brain.MemoryConfidence,avoidanceMemory=Sim.Brain.AvoidanceConfidence,reward=Sim.Brain.RewardSignal,edgeCollisions=Sim.EdgeCollisions},Settings.JsonOptions));}catch(IOException){}
+    }
+    sealed class LearnedMemoryData { public int Version {get;set;}=1; public float[] Values {get;set;}=[]; }
+    static string MemoryPath=>Path.Combine(Settings.Folder,"learned-memory.json");
+    void LoadMemory()
+    {
+        try{if(File.Exists(MemoryPath)){var data=JsonSerializer.Deserialize<LearnedMemoryData>(File.ReadAllText(MemoryPath),Settings.JsonOptions);if(data?.Version==1)Sim.Brain.ImportMemory(data.Values);}}
+        catch(Exception){/* A corrupt optional memory file must not stop the pet. */}
+    }
+    void SaveMemory()
+    {
+        try{Directory.CreateDirectory(Settings.Folder);var temp=MemoryPath+".tmp";File.WriteAllText(temp,JsonSerializer.Serialize(new LearnedMemoryData{Values=Sim.Brain.ExportMemory()},Settings.JsonOptions));File.Move(temp,MemoryPath,true);}
+        catch(IOException){}
     }
     protected override void ExitThreadCore()
     {
-        if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
+        if(disposing)return;disposing=true;timer.Stop();SaveMemory();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
         settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
