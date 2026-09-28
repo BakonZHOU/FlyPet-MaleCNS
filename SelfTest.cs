@@ -16,6 +16,7 @@ static class SelfTest
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
         var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance});
+        var enlarged=new Settings{PetSize=400};enlarged.Validate();Check("pet_size_400_is_preserved",enlarged.PetSize==400,new{size=enlarged.PetSize,max=Settings.MaxPetSize});
         float minimumDefaultLifetimeSeconds=65/(defaults.HungerPerMinute/60+defaults.FlightFullnessCostPerSecond)+100/defaults.StarvationDamagePerSecond;
         Check("default_hunger_survives_over_ten_minutes",minimumDefaultLifetimeSeconds>=600,new{seconds=minimumDefaultLifetimeSeconds,minutes=minimumDefaultLifetimeSeconds/60});
         Check("expanded_connectome_loaded",data.Nodes.Length==16711&&data.Edges.Length>2000000,new{neurons=data.Nodes.Length,edges=data.Edges.Length});

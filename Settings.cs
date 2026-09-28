@@ -4,6 +4,7 @@ namespace FlyPet;
 
 public sealed class Settings
 {
+    public const int MinPetSize=60,MaxPetSize=800;
     public int SchemaVersion { get; set; } = 5;
     public int FramesPerSecond { get; set; } = 90;
     public int PetSize { get; set; } = 90;
@@ -77,7 +78,7 @@ public sealed class Settings
     static float Safe(float value, float min, float max, float fallback) => float.IsFinite(value) ? Math.Clamp(value,min,max) : fallback;
     public void Validate()
     {
-        FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, 60, 320);
+        FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, MinPetSize, MaxPetSize);
         FlightSpeed = Safe(FlightSpeed, 30, 900,400); FearRadius = Safe(FearRadius,80,800,250);
         FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.008f);
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);

@@ -11,5 +11,6 @@ test-results-deathtext*/
 test-results-expanded*/
 test-results-lifecycle*/
 test-results-final-*/
+test-results-size-*/
 packaged-self-test*/
 *.user

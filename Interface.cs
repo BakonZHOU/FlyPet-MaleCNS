@@ -140,19 +140,20 @@ public sealed class SettingsWindow : Form
         void Num(string name,string label,decimal min,decimal max,decimal value,int decimals=0)
         {
             scroll.Controls.Add(Theme.Label(label,8,y+5,355,30));
-            var n=new NumericUpDown{Location=new(390,y),Size=new(174,30),Minimum=min,Maximum=max,DecimalPlaces=decimals,Increment=decimals==0?1:.1m,Value=value,BackColor=Theme.Panel,ForeColor=Theme.Text,BorderStyle=BorderStyle.FixedSingle};
+            decimal increment=decimals switch{0=>1m,1=>.1m,2=>.01m,3=>.001m,_=>.0001m};
+            var n=new NumericUpDown{Location=new(390,y),Size=new(174,30),Minimum=min,Maximum=max,DecimalPlaces=decimals,Increment=increment,Value=value,BackColor=Theme.Panel,ForeColor=Theme.Text,BorderStyle=BorderStyle.FixedSingle};
             numbers[name]=n;scroll.Controls.Add(n);y+=43;
         }
         var s=app.Settings;
         Num(nameof(s.FramesPerSecond),"显示帧率（FPS）",20,120,s.FramesPerSecond);
-        Num(nameof(s.PetSize),"苍蝇显示大小（像素）",60,320,s.PetSize);
+        Num(nameof(s.PetSize),"苍蝇显示大小（像素）",Settings.MinPetSize,Settings.MaxPetSize,s.PetSize);
         Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,900,(decimal)s.FlightSpeed);
         Num(nameof(s.FearRadius),"鼠标威胁感知范围（像素）",80,800,(decimal)s.FearRadius);
         Num(nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
-        Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,1);
-        Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,1);
+        Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,2);
+        Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,3);
         Num(nameof(s.AlarmSeconds),"受击后快速逃离持续秒数",.1m,10,(decimal)s.AlarmSeconds,1);
-        Num(nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,1);
+        Num(nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,2);
         Num(nameof(s.AlbinoChance),"白眼果蝇出现概率",0,1,(decimal)s.AlbinoChance,2);
         Num(nameof(s.AlbinoSpeedMultiplier),"白眼果蝇速度倍率",1,3,(decimal)s.AlbinoSpeedMultiplier,2);
         Num(nameof(s.RespawnMinSeconds),"随机复活最短等待（秒）",1,3600,(decimal)s.RespawnMinSeconds);
