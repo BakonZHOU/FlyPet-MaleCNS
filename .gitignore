@@ -9,5 +9,7 @@ test-results-albino-final*/
 test-results-tray*/
 test-results-deathtext*/
 test-results-expanded*/
+test-results-lifecycle*/
+test-results-final-*/
 packaged-self-test*/
 *.user

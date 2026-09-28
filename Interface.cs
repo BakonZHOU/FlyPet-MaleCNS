@@ -161,6 +161,9 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.SensoryGain),"感觉输入增益（0 可关闭输入）",0,4,(decimal)s.SensoryGain,1);
         Num(nameof(s.SugarAttractionRadius),"糖的吸引范围（像素）",100,10000,(decimal)s.SugarAttractionRadius);
         Num(nameof(s.SugarNutrition),"每块糖恢复的饱腹值",1,100,(decimal)s.SugarNutrition);
+        Num(nameof(s.SugarEatingSeconds),"吃完一块糖所需秒数",.2m,10,(decimal)s.SugarEatingSeconds,1);
+        Num(nameof(s.SatiatedThreshold),"开始回血的饱腹阈值",50,100,(decimal)s.SatiatedThreshold);
+        Num(nameof(s.SatiatedRegenPerSecond),"饱腹时每秒回血",0,20,(decimal)s.SatiatedRegenPerSecond,1);
         Num(nameof(s.LearningRate),"奖励位置学习率",0,2,(decimal)s.LearningRate,2);
         Num(nameof(s.MemoryDecayPerMinute),"位置记忆每分钟衰减",0,1,(decimal)s.MemoryDecayPerMinute,3);
         Num(nameof(s.SugarReward),"吃糖奖励信号",0,2,(decimal)s.SugarReward,2);

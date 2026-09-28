@@ -3,38 +3,68 @@
   "failures": 0,
   "tests": [
     {
-      "name": "real_connectome_loaded",
+      "name": "default_parameters",
       "passed": true,
       "detail": {
-        "neurons": 1800,
-        "edges": 135624
+        "petSize": 90,
+        "albinoChance": 0.1
+      }
+    },
+    {
+      "name": "default_hunger_survives_over_ten_minutes",
+      "passed": true,
+      "detail": {
+        "seconds": 3546.875,
+        "minutes": 59.114582
+      }
+    },
+    {
+      "name": "expanded_connectome_loaded",
+      "passed": true,
+      "detail": {
+        "neurons": 16711,
+        "edges": 2075126
+      }
+    },
+    {
+      "name": "expanded_functional_groups",
+      "passed": true,
+      "detail": {
+        "olfactory": 2200,
+        "memory": 3201,
+        "navigation": 2600,
+        "descending": 1314
       }
     },
     {
       "name": "sided_neural_steering",
       "passed": true,
       "detail": {
-        "rightDN": 0.07617346,
-        "leftDN": -0.009829365,
-        "centerDN": 0.13878797,
-        "rightOpto": 0.30662295,
-        "leftOpto": -0.45759422,
-        "centerOpto": 0.024943542
+        "rightDN": 0,
+        "leftDN": 0,
+        "centerDN": 0,
+        "rightOpto": 0.4688659,
+        "leftOpto": -0.67114794,
+        "centerOpto": 0.07570204
       }
     },
     {
       "name": "neural_flight_and_movement",
       "passed": true,
       "detail": {
-        "distance": 304.2805,
-        "flight": 0.70405954,
-        "spikes": 34273,
-        "visual": 7.098588,
-        "flightRate": 0,
-        "wing": 9.856833,
-        "escape": 35.992332,
-        "turn": -1.1435645E-19,
-        "optomotor": 30.007011
+        "distance": 223.85365,
+        "flight": 0.71703565,
+        "fear": 0,
+        "spikes": 95589,
+        "visual": 11.057166,
+        "navigation": 3.636259E-18,
+        "descending": 0.85305977,
+        "motor": 1.1997313,
+        "flightRate": 5.963106E-18,
+        "wing": 9.762197,
+        "escapeRaw": 42.70941,
+        "turn": 0,
+        "optomotor": 36.254692
       }
     },
     {
@@ -49,42 +79,73 @@
       "name": "connectome_is_required_for_motor_output",
       "passed": true,
       "detail": {
-        "connectedSpikes": 34273,
-        "severedSpikes": 29584,
+        "connectedSpikes": 95589,
+        "severedSpikes": 30350,
         "severedDistance": 0,
         "severedFlight": 0
       }
     },
     {
-      "name": "sugar_contact_feeds_and_consumes",
+      "name": "sugar_requires_feeding_time",
       "passed": true,
       "detail": {
-        "fullness": 47.983505,
-        "sugar": 76.749435,
-        "feeding": 0.3912216
+        "fullness": 24.992035,
+        "sugarCount": 1,
+        "behavior": "\u8FDB\u98DF\u4E2D",
+        "feeding": 0.406088
+      }
+    },
+    {
+      "name": "sugar_is_consumed_once",
+      "passed": true,
+      "detail": {
+        "fullness": 56.893093,
+        "sugarCount": 0,
+        "feeding": 2.585517E-19
       }
     },
     {
       "name": "remote_sugar_attraction",
       "passed": true,
       "detail": {
-        "fullness": 99.01903,
-        "distance": 11.550323,
-        "x": 1412.2039,
-        "y": 476.2572,
-        "heading": -1.8811607,
-        "turn": -1.6153843E-09,
-        "opto": 14.193476,
-        "flight": 0.1679311
+        "fullness": 51.551342,
+        "distance": 0,
+        "x": 1115.3071,
+        "y": 360.66696,
+        "heading": 1.1476035,
+        "turn": -1E-45,
+        "opto": 58.500595,
+        "flight": 0.76448643
       }
     },
     {
-      "name": "swatter_avoidance",
+      "name": "olfactory_circuit_improves_sugar_approach",
+      "passed": true,
+      "detail": {
+        "smellFrames": 547,
+        "noSmellFrames": 960,
+        "smellDistance": 0,
+        "noSmellDistance": 1120.6849,
+        "olfactory": 13.462205
+      }
+    },
+    {
+      "name": "cursor_avoidance",
       "passed": true,
       "detail": {
         "before": 60,
-        "after": 158.12416,
-        "fear": 0.92690873
+        "after": 473.86465,
+        "fear": 0.9521611
+      }
+    },
+    {
+      "name": "cursor_escape_uses_turning_circuit",
+      "passed": true,
+      "detail": {
+        "heading": -0.5864018,
+        "optomotor": -1,
+        "descending": -0.0066846954,
+        "turn": 0
       }
     },
     {
@@ -121,6 +182,15 @@
       }
     },
     {
+      "name": "edge_input_activates_navigation_circuit",
+      "passed": true,
+      "detail": {
+        "rate": 0.617322,
+        "turn": 0.073009916,
+        "visualMotion": 0.40480778
+      }
+    },
+    {
       "name": "invincible_hit_still_alarms",
       "passed": true,
       "detail": {
@@ -140,11 +210,67 @@
       "detail": null
     },
     {
+      "name": "edge_collision_is_nonlethal_negative_input",
+      "passed": true,
+      "detail": {
+        "health": 100,
+        "collisions": 1,
+        "reward": -1,
+        "wall": 0.8281153
+      }
+    },
+    {
+      "name": "reward_memory_learns_sugar_place",
+      "passed": true,
+      "detail": {
+        "confidence": 0.42869395,
+        "x": 0.78125,
+        "y": 0.20833333
+      }
+    },
+    {
+      "name": "negative_memory_learns_edge_place",
+      "passed": true,
+      "detail": {
+        "confidence": 0.3143075,
+        "local": 1,
+        "x": 0.03125,
+        "y": 0.5416667,
+        "awayX": 0.9931536
+      }
+    },
+    {
+      "name": "new_fly_starts_with_blank_memory",
+      "passed": true,
+      "detail": {
+        "positive": 0,
+        "negative": 0
+      }
+    },
+    {
+      "name": "albino_hidden_skin",
+      "passed": true,
+      "detail": null
+    },
+    {
+      "name": "cleaned_corpse_stays_clean",
+      "passed": true,
+      "detail": null
+    },
+    {
       "name": "flight_consumes_fullness",
       "passed": true,
       "detail": {
-        "flying": 17.800316,
+        "flying": 19.949139,
         "zeroFlightCost": 20
+      }
+    },
+    {
+      "name": "satiated_fly_regenerates_health",
+      "passed": true,
+      "detail": {
+        "health": 53.99994,
+        "fullness": 90
       }
     },
     {
@@ -157,8 +283,8 @@
       "passed": true,
       "detail": {
         "simulatedSeconds": 30,
-        "wallSeconds": 0.2362583,
-        "realtimeFactor": 126.97966589956839,
+        "wallSeconds": 3.6333352,
+        "realtimeFactor": 8.256876491879968,
         "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD"
       }
     },
@@ -166,7 +292,7 @@
       "name": "render_budget_90fps",
       "passed": true,
       "detail": {
-        "averageMs": 1.1294573333333333
+        "averageMs": 1.9387173333333332
       }
     }
   ]

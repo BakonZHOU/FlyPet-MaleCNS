@@ -43,7 +43,7 @@ public sealed class Brain
     readonly int[] optomotor, reverse;
     readonly int[] optoLeft,optoRight;
     readonly int[] visualMotionStim,olfactoryStim,rewardStim,placeCells;
-    readonly int[] visualMotionLeft,visualMotionRight,olfactoryLeft,olfactoryRight,navigationLeft,navigationRight,descendingLeft,descendingRight;
+    readonly int[] visualMotionLeft,visualMotionRight,olfactoryLeft,olfactoryRight,navigationLeft,navigationRight,navigationStimLeft,navigationStimRight,descendingLeft,descendingRight;
     readonly float[] placeX,placeY,placeActivity,placeValue;
     float odorDirectionInput,wallDirectionInput;
     public int NeuronCount => voltage.Length;
@@ -78,6 +78,9 @@ public sealed class Brain
     public float AvoidedX { get; private set; }=.5f;
     public float AvoidedY { get; private set; }=.5f;
     public float AvoidanceConfidence { get; private set; }
+    public float AvoidanceVectorX { get; private set; }
+    public float AvoidanceVectorY { get; private set; }
+    public float LocalAvoidanceConfidence { get; private set; }
     public float RewardSignal { get; private set; }
     public float WallDrive { get; private set; }
     public float ThreatDrive { get; private set; }
@@ -98,6 +101,7 @@ public sealed class Brain
         visualMotionLeft=visualMotionStim.Where(i=>data.Nodes[i].Side=="L").ToArray();visualMotionRight=visualMotionStim.Where(i=>data.Nodes[i].Side=="R").ToArray();
         olfactoryLeft=olfactoryStim.Where(i=>data.Nodes[i].Side=="L").ToArray();olfactoryRight=olfactoryStim.Where(i=>data.Nodes[i].Side=="R").ToArray();
         navigationLeft=groups["navigation"].Where(i=>data.Nodes[i].Side=="L").ToArray();navigationRight=groups["navigation"].Where(i=>data.Nodes[i].Side=="R").ToArray();
+        navigationStimLeft=Sample(navigationLeft,128);navigationStimRight=Sample(navigationRight,128);
         descendingLeft=groups["descending"].Where(i=>data.Nodes[i].Side=="L").ToArray();descendingRight=groups["descending"].Where(i=>data.Nodes[i].Side=="R").ToArray();
         placeCells=Sample(groups["memory"],192);placeX=new float[placeCells.Length];placeY=new float[placeCells.Length];placeActivity=new float[placeCells.Length];placeValue=new float[placeCells.Length];
         int columns=16,rows=Math.Max(1,(int)Math.Ceiling(placeCells.Length/(double)columns));
@@ -129,14 +133,19 @@ public sealed class Brain
         void Add(int[] ids,float v){foreach(int i in ids)drive[i]+=v*s.SensoryGain;}
         ThreatDrive=threat;WallDrive=wall;FoodDrive=travel;
         odorDirectionInput=Math.Clamp(odorTurn,-1,1);wallDirectionInput=Math.Clamp(wallTurn,-1,1);
-        // External drives replace missing retina/olfaction/proprioception. They enter sensory populations only.
+        // External drives replace missing retina/olfaction/proprioception. Most enter sensory populations;
+        // the sparse navigation bridge below is an explicit model component for edge/place direction.
         float motivation=Math.Clamp((100-fullness)/100,0,1);
         Add(groups["visual"],Math.Clamp(travel*(8+4*motivation)+threat*10+wall*8,0,23));
-        Add(visualLeft,Math.Max(0,-turn)*4.5f);Add(visualRight,Math.Max(0,turn)*4.5f);
+        Add(visualLeft,Math.Max(0,-turn)*(6+threat*8));Add(visualRight,Math.Max(0,turn)*(6+threat*8));
         Add(visualMotionStim,Math.Clamp(wall*9+punishment*14+threat*5,0,24));
-        Add(visualMotionLeft,Math.Max(0,-wallTurn)*10);Add(visualMotionRight,Math.Max(0,wallTurn)*10);
+        Add(visualMotionLeft,Math.Max(0,-wallTurn)*10+Math.Max(0,-turn)*threat*12);Add(visualMotionRight,Math.Max(0,wallTurn)*10+Math.Max(0,turn)*threat*12);
         Add(olfactoryStim,Math.Clamp(odor*(7+13*motivation),0,22));
         Add(olfactoryLeft,Math.Max(0,-odorTurn)*8);Add(olfactoryRight,Math.Max(0,odorTurn)*8);
+        // A sparse navigation population receives the decoded edge/place-memory direction.
+        // Its bilateral firing, rather than this input value, is used for most of the body turn.
+        float navigationDrive=Math.Clamp(Math.Max(wall,LocalAvoidanceConfidence),0,1),navigationInput=wall>.05f?wallTurn:turn;
+        Add(navigationStimLeft,Math.Max(0,-navigationInput)*navigationDrive*12);Add(navigationStimRight,Math.Max(0,navigationInput)*navigationDrive*12);
         Add(groups["taste"],contact*14);
         Add(rewardStim,Math.Clamp(Math.Abs(reward-punishment)*20,0,24));
         float decay=MathF.Exp(-Math.Max(0,s.MemoryDecayPerMinute)/60*frameDt);
@@ -149,7 +158,7 @@ public sealed class Brain
             // strengthen it, so frequency matters instead of one event saturating memory.
             placeValue[k]=Math.Clamp(placeValue[k]*decay+activation*valence*s.LearningRate*frameDt*1.2f,-1,1);
         }
-        UpdateRememberedPlace();
+        UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY);
     }
     public void Step(float gain)
     {
@@ -179,11 +188,13 @@ public sealed class Brain
         // Direction is encoded by the bilateral receptor input. A turn is emitted only
         // while the matching sensory population is firing and graph propagation is on.
         OdorTurn=Math.Clamp(odorDirectionInput*odorGate,-1,1);
-        float navigationLateral=(Mean(navigationRight)-Mean(navigationLeft))/50;
-        NavigationTurn=Math.Clamp(navigationLateral*.35f+wallDirectionInput*wallGate*.9f,-1,1);
+        float navigationLateral=(Mean(navigationRight)-Mean(navigationLeft))/18;
+        NavigationTurn=Math.Clamp(navigationLateral*.9f+wallDirectionInput*wallGate*.25f,-1,1);
         DescendingTurn=Math.Clamp((Mean(descendingRight)-Mean(descendingLeft))/50,-1,1);
         Flight=Math.Clamp(FlightRate/55+WingRate/14+MotorRate/80+DescendingRate/180,0,1);
-        Fear=Math.Clamp(EscapeRate/50+DescendingRate/160,0,1);
+        // These two escape neurons also have descending annotations and fire under broad visual drive.
+        // Treat their rate as escape only while threat/alarm sensory input is present.
+        Fear=Math.Clamp((EscapeRate/50+DescendingRate/160)*Math.Clamp(ThreatDrive*1.6f,0,1),0,1);
         // MN9 does not reliably fire in this reduced induced subgraph. Feeding therefore uses the sensory
         // sweet-GRN rate as a documented fallback; the evidence window exposes MN9 separately instead of hiding it.
         Feeding=Math.Clamp(TasteRate/50,0,1);
@@ -201,10 +212,27 @@ public sealed class Brain
         if(worstIndex>=0){AvoidedX=placeX[worstIndex];AvoidedY=placeY[worstIndex];}
         MemoryConfidence=Math.Clamp(best,0,1);AvoidanceConfidence=Math.Clamp(-worst,0,1);
     }
+    void UpdateLocalAvoidance(float positionX,float positionY)
+    {
+        float x=0,y=0,total=0;
+        for(int i=0;i<placeValue.Length;i++)if(placeValue[i]<0)
+        {
+            float dx=positionX-placeX[i],dy=positionY-placeY[i],d2=dx*dx+dy*dy;
+            if(d2<.000001f)continue;
+            float influence=-placeValue[i]*MathF.Exp(-d2/.028f),inverse=1/MathF.Sqrt(d2);
+            x+=dx*inverse*influence;y+=dy*inverse*influence;total+=influence;
+        }
+        float length=MathF.Sqrt(x*x+y*y);if(length>.0001f){AvoidanceVectorX=x/length;AvoidanceVectorY=y/length;}else AvoidanceVectorX=AvoidanceVectorY=0;
+        LocalAvoidanceConfidence=Math.Clamp(total,0,1);
+    }
     public float[] ExportMemory()=>(float[])placeValue.Clone();
     public void ImportMemory(float[] values)
     {
         int count=Math.Min(values.Length,placeValue.Length);for(int i=0;i<count;i++)placeValue[i]=float.IsFinite(values[i])?Math.Clamp(values[i],-1,1):0;UpdateRememberedPlace();
+    }
+    public void ClearMemory()
+    {
+        Array.Clear(placeValue);Array.Clear(placeActivity);RememberedX=RememberedY=AvoidedX=AvoidedY=.5f;MemoryConfidence=AvoidanceConfidence=LocalAvoidanceConfidence=AvoidanceVectorX=AvoidanceVectorY=0;
     }
     float Mean(int[] ids){float sum=0;foreach(int i in ids)sum+=rates[i];return ids.Length==0?0:sum/ids.Length;}
 }

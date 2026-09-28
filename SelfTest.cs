@@ -16,21 +16,25 @@ static class SelfTest
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
         var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance});
+        float minimumDefaultLifetimeSeconds=65/(defaults.HungerPerMinute/60+defaults.FlightFullnessCostPerSecond)+100/defaults.StarvationDamagePerSecond;
+        Check("default_hunger_survives_over_ten_minutes",minimumDefaultLifetimeSeconds>=600,new{seconds=minimumDefaultLifetimeSeconds,minutes=minimumDefaultLifetimeSeconds/60});
         Check("expanded_connectome_loaded",data.Nodes.Length==16711&&data.Edges.Length>2000000,new{neurons=data.Nodes.Length,edges=data.Edges.Length});
         Check("expanded_functional_groups",new[]{"visual_motion","olfactory","memory","reward","navigation","descending","motor"}.All(g=>data.Nodes.Any(n=>n.Groups.Contains(g))),new{olfactory=data.Nodes.Count(n=>n.Groups.Contains("olfactory")),memory=data.Nodes.Count(n=>n.Groups.Contains("memory")),navigation=data.Nodes.Count(n=>n.Groups.Contains("navigation")),descending=data.Nodes.Count(n=>n.Groups.Contains("descending"))});
         (float turn,float opto) ProbeTurn(float turn){var b=new Brain(data);var s=new Settings();b.SetInput(0,0,20,turn,.95f,0,s);for(int i=0;i<2000;i++)b.Step(1);return (b.Turn,b.OptomotorTurn);}
         var rightProbe=ProbeTurn(1);var leftProbe=ProbeTurn(-1);var centerProbe=ProbeTurn(0);
         Check("sided_neural_steering",rightProbe.opto>leftProbe.opto+.2f,new{rightDN=rightProbe.turn,leftDN=leftProbe.turn,centerDN=centerProbe.turn,rightOpto=rightProbe.opto,leftOpto=leftProbe.opto,centerOpto=centerProbe.opto});
         var sim=Make();var start=sim.Position;Advance(sim,8);
-        Check("neural_flight_and_movement",Vector2.Distance(start,sim.Position)>80&&sim.Brain.Flight>.03f&&sim.Brain.TotalSpikes>100,new{distance=Vector2.Distance(start,sim.Position),flight=sim.Brain.Flight,spikes=sim.Brain.TotalSpikes,visual=sim.Brain.VisualRate,flightRate=sim.Brain.FlightRate,wing=sim.Brain.WingRate,escape=sim.Brain.EscapeRate,turn=sim.Brain.Turn,optomotor=sim.Brain.OptomotorRate});
+        Check("neural_flight_and_movement",Vector2.Distance(start,sim.Position)>80&&sim.Brain.Flight>.03f&&sim.Brain.TotalSpikes>100&&sim.Brain.Fear<.05f,new{distance=Vector2.Distance(start,sim.Position),flight=sim.Brain.Flight,fear=sim.Brain.Fear,spikes=sim.Brain.TotalSpikes,visual=sim.Brain.VisualRate,navigation=sim.Brain.NavigationRate,descending=sim.Brain.DescendingRate,motor=sim.Brain.MotorRate,flightRate=sim.Brain.FlightRate,wing=sim.Brain.WingRate,escapeRaw=sim.Brain.EscapeRate,turn=sim.Brain.Turn,optomotor=sim.Brain.OptomotorRate});
         var noInput=Make(new(){SensoryGain=0});var start2=noInput.Position;Advance(noInput,8);
         Check("sensory_ablation_stops_flight",Vector2.Distance(start2,noInput.Position)<1&&noInput.Brain.TotalSpikes==0,new{distance=Vector2.Distance(start2,noInput.Position),spikes=noInput.Brain.TotalSpikes});
         var noSynapse=Make(new(){NeuralGain=0});Advance(noSynapse,8);
         Check("connectome_is_required_for_motor_output",Vector2.Distance(start2,noSynapse.Position)<1&&noSynapse.Brain.Flight<.001f&&Math.Abs(noSynapse.Brain.TotalSpikes-sim.Brain.TotalSpikes)>100,new{connectedSpikes=sim.Brain.TotalSpikes,severedSpikes=noSynapse.Brain.TotalSpikes,severedDistance=Vector2.Distance(start2,noSynapse.Position),severedFlight=noSynapse.Brain.Flight});
-        var feed=Make();feed.Fullness=25;feed.AddSugar(feed.Position);Advance(feed,4);
+        var feed=Make(new(){SugarEatingSeconds=1.8f});feed.Fullness=25;feed.AddSugar(feed.Position);Advance(feed,.6f);
+        Check("sugar_requires_feeding_time",feed.Sugars.Count==1&&feed.Fullness<30,new{fullness=feed.Fullness,sugarCount=feed.Sugars.Count,behavior=feed.Behavior,feeding=feed.Brain.Feeding});
+        Advance(feed,3.4f);
         float afterSugar=feed.Fullness;Advance(feed,2);
         Check("sugar_is_consumed_once",afterSugar>45&&feed.Sugars.Count==0&&Math.Abs(feed.Fullness-afterSugar)<1,new{fullness=feed.Fullness,sugarCount=feed.Sugars.Count,feeding=feed.Brain.Feeding});
-        var seek=Make();seek.Fullness=20;seek.AddSugar(seek.Position+new Vector2(350,0));Advance(seek,20);
+        var seek=Make();seek.Fullness=20;seek.AddSugar(seek.Position+new Vector2(350,0));Advance(seek,24);
         Check("remote_sugar_attraction",seek.Fullness>30,new{fullness=seek.Fullness,distance=Vector2.Distance(seek.Position,seek.Sugars.FirstOrDefault()?.Position??seek.Position),x=seek.Position.X,y=seek.Position.Y,heading=seek.Heading,turn=seek.Brain.Turn,opto=seek.Brain.OptomotorRate,flight=seek.Brain.Flight});
         var smell=Make(new(){SugarAttractionRadius=2200,HungerPerMinute=0,RestEnabled=false});var noSmell=Make(new(){SugarAttractionRadius=100,HungerPerMinute=0,RestEnabled=false});
         var smellSugar=smell.Position+new Vector2(420,0);smell.Fullness=noSmell.Fullness=20;smell.AddSugar(smellSugar);noSmell.AddSugar(smellSugar);
@@ -40,6 +44,8 @@ static class SelfTest
         Check("olfactory_circuit_improves_sugar_approach",smellFrames+60<noSmellFrames||smellDistance+40<noSmellDistance,new{smellFrames,noSmellFrames,smellDistance,noSmellDistance,olfactory=smell.Brain.OlfactoryRate});
         var scared=Make();var threat=scared.Position+new Vector2(60,0);float d0=Vector2.Distance(scared.Position,threat);Advance(scared,.7f,true,threat);
         Check("cursor_avoidance",Vector2.Distance(scared.Position,threat)>d0+20,new{before=d0,after=Vector2.Distance(scared.Position,threat),fear=scared.Brain.Fear});
+        var turning=Make(new(){RestEnabled=false});turning.Heading=0;var turnThreat=turning.Position+new Vector2(60,0);Advance(turning,.45f,true,turnThreat);
+        Check("cursor_escape_uses_turning_circuit",Math.Abs(turning.Heading)>.35f,new{heading=turning.Heading,optomotor=turning.Brain.OptomotorTurn,descending=turning.Brain.DescendingTurn,turn=turning.Brain.Turn});
         var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
         Advance(dying,2.1f);Check("random_respawn",!dying.Dead&&dying.Health==100);
         var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead);
@@ -48,6 +54,8 @@ static class SelfTest
         var edgeOn=Make();edgeOn.Position=new(area.Left+65,area.Top+area.Height*.5f);Advance(edgeOn,.02f);
         var edgeOff=Make(new(){EdgeSensing=false});edgeOff.Position=edgeOn.Position;Advance(edgeOff,.02f);
         Check("edge_sensory_stimulus",edgeOn.Brain.WallDrive>.4f&&edgeOff.Brain.WallDrive==0,new{enabled=edgeOn.Brain.WallDrive,disabled=edgeOff.Brain.WallDrive});
+        var navigationProbe=new Brain(data);for(int frame=0;frame<240;frame++){navigationProbe.SetInput(0,0,60,1,.95f,.9f,new Settings(),wallTurn:1,positionX:.05f,positionY:.5f,frameDt:1f/120);for(int ms=0;ms<8;ms++)navigationProbe.Step(1);}
+        Check("edge_input_activates_navigation_circuit",navigationProbe.NavigationRate>.2f&&navigationProbe.NavigationTurn>.02f,new{rate=navigationProbe.NavigationRate,turn=navigationProbe.NavigationTurn,visualMotion=navigationProbe.VisualMotionRate});
         var protectedFly=Make(new(){Invincible=true,SwatDamage=100});Advance(protectedFly,.2f);protectedFly.Hit(protectedFly.Position);
         Check("invincible_hit_still_alarms",protectedFly.Health==100&&protectedFly.Alarm>0&&protectedFly.InjuryArousal>0,new{health=protectedFly.Health,alarm=protectedFly.Alarm,injury=protectedFly.InjuryArousal});
         Advance(protectedFly,3);Check("injury_arousal_persists",protectedFly.Alarm<1&&protectedFly.InjuryArousal>0);
@@ -59,13 +67,18 @@ static class SelfTest
         var learned=learner.ExportMemory();var restored=new Brain(data);restored.ImportMemory(learned);
         Check("reward_memory_learns_sugar_place",learner.MemoryConfidence>.1f&&Math.Abs(learner.RememberedX-.78f)<.12f&&Math.Abs(learner.RememberedY-.22f)<.12f&&Math.Abs(restored.MemoryConfidence-learner.MemoryConfidence)<.001f,new{confidence=learner.MemoryConfidence,x=learner.RememberedX,y=learner.RememberedY});
         var avoidLearner=new Brain(data);for(int frame=0;frame<240;frame++){avoidLearner.SetInput(0,0,25,0,.95f,.9f,learningSettings,wallTurn:1,positionX:.04f,positionY:.52f,punishment:1,frameDt:1f/120);for(int ms=0;ms<8;ms++)avoidLearner.Step(1);}
-        Check("negative_memory_learns_edge_place",avoidLearner.AvoidanceConfidence>.1f&&avoidLearner.AvoidedX<.15f&&Math.Abs(avoidLearner.AvoidedY-.52f)<.15f,new{confidence=avoidLearner.AvoidanceConfidence,x=avoidLearner.AvoidedX,y=avoidLearner.AvoidedY});
+        avoidLearner.SetInput(0,0,25,0,.95f,0,learningSettings,positionX:.13f,positionY:.52f,frameDt:1f/120);
+        Check("negative_memory_learns_edge_place",avoidLearner.AvoidanceConfidence>.1f&&avoidLearner.AvoidedX<.15f&&Math.Abs(avoidLearner.AvoidedY-.52f)<.15f&&avoidLearner.LocalAvoidanceConfidence>.1f&&avoidLearner.AvoidanceVectorX>0,new{confidence=avoidLearner.AvoidanceConfidence,local=avoidLearner.LocalAvoidanceConfidence,x=avoidLearner.AvoidedX,y=avoidLearner.AvoidedY,awayX=avoidLearner.AvoidanceVectorX});
+        var freshLife=Make();freshLife.Brain.ImportMemory(avoidLearner.ExportMemory());freshLife.Revive(area);
+        Check("new_fly_starts_with_blank_memory",freshLife.Brain.AvoidanceConfidence==0&&freshLife.Brain.MemoryConfidence==0,new{positive=freshLife.Brain.MemoryConfidence,negative=freshLife.Brain.AvoidanceConfidence});
         var albino=Make(new(){AlbinoChance=1,AlbinoSpeedMultiplier=1.5f});Check("albino_hidden_skin",albino.Albino&&albino.Health==albino.MaxHealth&&albino.MaxHealth==180);
         var corpse=Make(new(){SwatDamage=100,RespawnMinSeconds=1,RespawnMaxSeconds=1});corpse.Hit(corpse.Position);corpse.CleanRemains();Advance(corpse,2);Check("cleaned_corpse_stays_clean",corpse.Dead&&!corpse.RemainsVisible);
         var flying=Make(new(){RestEnabled=false,HungerPerMinute=0});var resting=Make(new(){RestEnabled=false,HungerPerMinute=0,FlightFullnessCostPerSecond=0});
         flying.Fullness=resting.Fullness=20;
         Advance(flying,8);Advance(resting,8);
-        Check("flight_consumes_fullness",flying.Fullness<resting.Fullness-.1f,new{flying=flying.Fullness,zeroFlightCost=resting.Fullness});
+        Check("flight_consumes_fullness",flying.Fullness<resting.Fullness-.03f,new{flying=flying.Fullness,zeroFlightCost=resting.Fullness});
+        var healing=Make(new(){HungerPerMinute=0,FlightFullnessCostPerSecond=0,SatiatedThreshold=80,SatiatedRegenPerSecond=2});healing.Fullness=90;healing.Health=50;Advance(healing,2);
+        Check("satiated_fly_regenerates_health",healing.Health>=53.8f,new{health=healing.Health,fullness=healing.Fullness});
         var invalid=new Settings{FramesPerSecond=999,PetSize=-2,NeuralGain=float.NaN,RespawnMinSeconds=5,RespawnMaxSeconds=-9};invalid.Validate();Check("configuration_validation",invalid.FramesPerSecond==120&&invalid.PetSize==60&&invalid.NeuralGain==1&&invalid.RespawnMaxSeconds==5);
         var bench=Make();Advance(bench,2);var watch=Stopwatch.StartNew();Advance(bench,30);watch.Stop();
         Check("neural_simulation_faster_than_realtime",watch.Elapsed.TotalSeconds<30,new{simulatedSeconds=30,wallSeconds=watch.Elapsed.TotalSeconds,realtimeFactor=30/watch.Elapsed.TotalSeconds,processor=Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER")});

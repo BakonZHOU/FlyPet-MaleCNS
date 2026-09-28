@@ -4,17 +4,17 @@ namespace FlyPet;
 
 public sealed class Settings
 {
-    public int SchemaVersion { get; set; } = 4;
+    public int SchemaVersion { get; set; } = 5;
     public int FramesPerSecond { get; set; } = 90;
     public int PetSize { get; set; } = 90;
     public float FlightSpeed { get; set; } = 400;
     public float FearRadius { get; set; } = 250;
     public float SwatDamage { get; set; } = 40;
-    public float HungerPerMinute { get; set; } = 1.6f;
-    public float FlightFullnessCostPerSecond { get; set; } = .02f;
+    public float HungerPerMinute { get; set; } = .8f;
+    public float FlightFullnessCostPerSecond { get; set; } = .008f;
     public float AlarmSeconds { get; set; } = 1.4f;
     public float FeedPerSecond { get; set; } = 15;
-    public float StarvationDamagePerSecond { get; set; } = .35f;
+    public float StarvationDamagePerSecond { get; set; } = .2f;
     public float AlbinoChance { get; set; } = .1f;
     public float AlbinoSpeedMultiplier { get; set; } = 1.55f;
     public float RespawnMinSeconds { get; set; } = 12;
@@ -23,6 +23,9 @@ public sealed class Settings
     public float SensoryGain { get; set; } = 1;
     public float SugarAttractionRadius { get; set; } = 2200;
     public float SugarNutrition { get; set; } = 32;
+    public float SugarEatingSeconds { get; set; } = 1.8f;
+    public float SatiatedThreshold { get; set; } = 85;
+    public float SatiatedRegenPerSecond { get; set; } = 1.5f;
     public float LearningRate { get; set; } = .18f;
     public float MemoryDecayPerMinute { get; set; } = .002f;
     public float SugarReward { get; set; } = 1;
@@ -57,6 +60,15 @@ public sealed class Settings
             if(exists&&(!doc!.RootElement.TryGetProperty(nameof(AlbinoChance),out _) || (storedSchema<4&&Math.Abs(s.AlbinoChance-.04f)<.0001f)))
             {s.AlbinoChance=.1f;s.AlbinoSpeedMultiplier=1.55f;changed=true;}
             if(exists&&storedSchema<4){s.SchemaVersion=4;s.ShowLaunchMenu=false;changed=true;}
+            // v5 slows the untouched v4 hunger defaults to roughly one hour from the
+            // normal 65% spawn state. Values the user customized are preserved.
+            if(exists&&storedSchema<5)
+            {
+                if(Math.Abs(s.HungerPerMinute-1.6f)<.0001f)s.HungerPerMinute=.8f;
+                if(Math.Abs(s.FlightFullnessCostPerSecond-.02f)<.0001f)s.FlightFullnessCostPerSecond=.008f;
+                if(Math.Abs(s.StarvationDamagePerSecond-.35f)<.0001f)s.StarvationDamagePerSecond=.2f;
+                s.SchemaVersion=5;changed=true;
+            }
             if(changed)s.Save();
             s.Validate(); return s;
         }
@@ -67,15 +79,17 @@ public sealed class Settings
     {
         FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, 60, 320);
         FlightSpeed = Safe(FlightSpeed, 30, 900,400); FearRadius = Safe(FearRadius,80,800,250);
-        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.02f);
+        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.008f);
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);
-        SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,1.6f);
-        FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,.35f);
+        SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,.8f);
+        FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,.2f);
         AlbinoChance=Safe(AlbinoChance,0,1,.1f);AlbinoSpeedMultiplier=Safe(AlbinoSpeedMultiplier,1,3,1.55f);
         RespawnMinSeconds = Safe(RespawnMinSeconds,1,3600,12); RespawnMaxSeconds = Safe(RespawnMaxSeconds,RespawnMinSeconds,7200,40);
         NeuralGain = Safe(NeuralGain,0,4,1); SensoryGain = Safe(SensoryGain,0,4,1);
         SugarAttractionRadius = Safe(SugarAttractionRadius,100,10000,2200); MaxSugar = Math.Clamp(MaxSugar,1,30);
-        SugarNutrition=Safe(SugarNutrition,1,100,32);LearningRate=Safe(LearningRate,0,2,.18f);MemoryDecayPerMinute=Safe(MemoryDecayPerMinute,0,1,.002f);
+        SugarNutrition=Safe(SugarNutrition,1,100,32);SugarEatingSeconds=Safe(SugarEatingSeconds,.2f,10,1.8f);
+        SatiatedThreshold=Safe(SatiatedThreshold,50,100,85);SatiatedRegenPerSecond=Safe(SatiatedRegenPerSecond,0,20,1.5f);
+        LearningRate=Safe(LearningRate,0,2,.18f);MemoryDecayPerMinute=Safe(MemoryDecayPerMinute,0,1,.002f);
         SugarReward=Safe(SugarReward,0,2,1);EdgePunishment=Safe(EdgePunishment,0,2,.75f);
         MonitorIndex = Math.Max(0, MonitorIndex);
     }

@@ -21,12 +21,12 @@ public sealed class FlyRenderer : IDisposable
             var deadState=output.Save();output.InterpolationMode=InterpolationMode.NearestNeighbor;output.PixelOffsetMode=PixelOffsetMode.Half;
             output.DrawImage(low,target,0,0,144,144,GraphicsUnit.Pixel);output.Restore(deadState);return;
         }
-        float nx=(sim.Position.X-desktop.Left)/Math.Max(1,desktop.Width)*2-1;
-        float ny=(sim.Position.Y-desktop.Top)/Math.Max(1,desktop.Height)*2-1;
         float bob=sim.Dead?0:MathF.Sin(sim.Time*6)*1.8f;
-        float shadowSpread=sim.Dead?1.25f:1+.08f*MathF.Sin(sim.Time*6);
-        using(var shadow=new SolidBrush(Color.FromArgb(24,7,6,4)))g.FillEllipse(shadow,38+nx*12,87+ny*7,68*shadowSpread,17*shadowSpread);
-        using(var coreShadow=new SolidBrush(Color.FromArgb(48,7,6,4)))g.FillEllipse(coreShadow,50+nx*10,90+ny*6,43*shadowSpread,9*shadowSpread);
+        float shadowSpread=sim.Grounded?1:1.12f;
+        var shadowState=g.Save();g.TranslateTransform(76,71);g.RotateTransform(sim.Heading*180/MathF.PI);
+        using(var shadow=new SolidBrush(Color.FromArgb(sim.Grounded?28:18,7,6,4)))g.FillEllipse(shadow,-39*shadowSpread,-43*shadowSpread,78*shadowSpread,86*shadowSpread);
+        using(var coreShadow=new SolidBrush(Color.FromArgb(sim.Grounded?48:31,7,6,4)))g.FillEllipse(coreShadow,-15*shadowSpread,-36*shadowSpread,30*shadowSpread,72*shadowSpread);
+        g.Restore(shadowState);
         faces.Clear();projected.Clear();
         // Overlapping tapered abdominal segments create a readable volume and self-occlusion.
         var abdomen1=sim.Albino?Color.FromArgb(145,125,96):Color.FromArgb(73,67,47);var abdomen2=sim.Albino?Color.FromArgb(124,105,80):Color.FromArgb(59,53,37);var abdomen3=sim.Albino?Color.FromArgb(164,139,101):Color.FromArgb(82,69,42);var abdomen4=sim.Albino?Color.FromArgb(106,90,70):Color.FromArgb(48,43,31);
@@ -46,7 +46,9 @@ public sealed class FlyRenderer : IDisposable
             Vector3 a=new(side*.19f,-.31f,.25f),b=new(side*1.75f,-.02f,flap),c=new(side*1.46f,.72f,flap*.82f),d=new(side*.54f,.86f,.25f);
             faces.Add(new(a,b,c,Color.FromArgb(126,161,170,151),51));faces.Add(new(a,c,d,Color.FromArgb(154,111,130,122),52));
         }
-        var rot=Matrix4x4.CreateRotationY(sim.Dead?MathF.PI:0)*Matrix4x4.CreateRotationZ(sim.Heading)*Matrix4x4.CreateRotationY(nx*.65f)*Matrix4x4.CreateRotationX(-ny*.50f-.27f);
+        // Desktop position no longer tilts the camera. Keep a small fixed pitch so the
+        // low-poly facets retain depth while the overall view remains top-down.
+        var rot=Matrix4x4.CreateRotationY(sim.Dead?MathF.PI:0)*Matrix4x4.CreateRotationZ(sim.Heading)*Matrix4x4.CreateRotationX(-.08f);
         PointF Project(Vector3 v){v=Vector3.Transform(v,rot);float p=4.1f/(4.1f-v.Z);return new(72+v.X*28*p,64+v.Y*28*p-v.Z*11-bob);}
         using(var legPen=new Pen(Color.FromArgb(47,42,28),2.1f){StartCap=LineCap.Round,EndCap=LineCap.Round,LineJoin=LineJoin.Round})
         using(var lightPen=new Pen(Color.FromArgb(116,102,62),.8f))
@@ -88,7 +90,7 @@ public sealed class FlyRenderer : IDisposable
         using(var hair=new Pen(Color.FromArgb(47,40,28),1))
         {
             for(int s=-1;s<=1;s+=2){var root=Project(new(s*.15f,-.91f,.20f));var tip=Project(new(s*.29f,-1.27f,.28f));g.DrawLine(hair,root,tip);g.FillEllipse(Brushes.SaddleBrown,tip.X-1.5f,tip.Y-1.5f,3,3);}
-            if(sim.Behavior=="吃糖")g.DrawLine(hair,Project(new(0,-.94f,.03f)),Project(new(0,-1.33f,-.29f)));
+            if(sim.Behavior is "进食中" or "吃掉糖粒并记住")g.DrawLine(hair,Project(new(0,-.94f,.03f)),Project(new(0,-1.33f,-.29f)));
         }
         if(meters)
         {

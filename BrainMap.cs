@@ -15,7 +15,7 @@ public sealed class BrainMapWindow : Form
     double lastSample;
     public BrainMapWindow(PetApplication app)
     {
-        this.app=app;Theme.Form(this);Text="FlyPet · 大脑神经元活动图";ClientSize=new(1190,760);MinimumSize=new(1190,760);StartPosition=FormStartPosition.CenterScreen;
+        this.app=app;Theme.Form(this);Text="FlyPet · 大脑神经元活动图";ClientSize=new(1190,820);MinimumSize=new(1190,820);StartPosition=FormStartPosition.CenterScreen;
         Controls.Add(Theme.Label("MaleCNS 神经元活动",22,15,640,40,19,Theme.Accent));
         Controls.Add(Theme.Label("点表示原始数据标注的胞体位置；亮度是本程序计算的近期放电率。XY/XZ 是解剖投影，不是手绘示意。",22,58,1100,28,9,Theme.Muted));
         view=new ComboBox{Location=new(25,94),Size=new(180,28),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};
@@ -31,9 +31,9 @@ public sealed class BrainMapWindow : Form
         view.SelectedIndexChanged+=(_,_)=>{map.View=view.SelectedIndex;map.Invalidate();};
         details=Theme.Label("点击亮点或灰点查看单个神经元",877,141,282,310,9,Theme.Muted);Controls.Add(details);
         summary=Theme.Label("",877,452,280,86,9,Theme.Accent);Controls.Add(summary);
-        Controls.Add(Theme.Label("最近 60 秒 · 各组放电率热图（每格约 100 ms）",22,552,800,26,10));
-        timeline=new ActivityTimeline(app){Location=new(22,580),Size=new(1137,130)};Controls.Add(timeline);
-        Controls.Add(Theme.Label("按图选择神经元可追踪最强输入与输出连接；右下角托盘另有确定性连接消融对照。亮起并不等于生物学功能得到验证。",22,719,1125,24,9,Theme.Muted));
+        Controls.Add(Theme.Label("最近 60 秒 · 各回路活动 / 有效输出热图（每格约 100 ms，对数亮度）",22,552,900,26,10));
+        timeline=new ActivityTimeline(app){Location=new(22,580),Size=new(1137,198)};Controls.Add(timeline);
+        Controls.Add(Theme.Label("按图选择神经元可追踪最强输入与输出连接；逃逸行显示威胁门控后的有效输出。亮起并不等于生物学功能得到验证。",22,787,1125,24,9,Theme.Muted));
         ResumeLayout(false);
     }
     public void RefreshActivity()
@@ -41,7 +41,7 @@ public sealed class BrainMapWindow : Form
         if(IsDisposed||!Visible||clock.Elapsed.TotalSeconds-lastSample<.1)return;
         lastSample=clock.Elapsed.TotalSeconds;timeline.Record();map.Invalidate();timeline.Invalidate();
         if(selected>=0)UpdateDetails();
-        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n胞体坐标 {(app.Circuit.Nodes.Count(n=>n.Soma?.Length==3)):N0} 个\n视觉 {b.VisualRate:0.0} Hz · 嗅觉 {b.OlfactoryRate:0.0} Hz\n记忆置信 {b.MemoryConfidence:0.00} · 奖励 {b.RewardSignal:+0.00;-0.00;0.00}";
+        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n视觉 {b.VisualRate:0.0} · 嗅觉 {b.OlfactoryRate:0.0} Hz\n导航 {b.NavigationRate:0.0} Hz · 转向 {b.NavigationTurn:+0.00;-0.00;0.00}\n逃逸原始 {b.EscapeRate:0.0} Hz · 有效 {b.Fear:0.00}\n记忆 {b.MemoryConfidence:0.00} · 奖励 {b.RewardSignal:+0.00;-0.00;0.00}";
     }
     void UpdateDetails()
     {
@@ -126,7 +126,7 @@ public sealed class ActivityTimeline : Control
     readonly float[,] values=new float[9,600];
     readonly SolidBrush[] palette;
     int head,count;
-    static readonly string[] names=["视觉","嗅觉","记忆","奖励","导航","逃逸","下行","运动","甜味"];
+    static readonly string[] names=["视觉","嗅觉","记忆","奖励","导航","逃逸输出","下行","运动","甜味"];
     public ActivityTimeline(PetApplication app)
     {
         this.app=app;DoubleBuffered=true;BackColor=Theme.Panel;
@@ -134,21 +134,21 @@ public sealed class ActivityTimeline : Control
     }
     public void Record()
     {
-        var b=app.Sim.Brain;float[] v=[b.VisualRate,b.OlfactoryRate,b.MemoryRate,b.RewardRate,b.NavigationRate,b.EscapeRate,b.DescendingRate,b.MotorRate,b.TasteRate];
-        for(int i=0;i<v.Length;i++)values[i,head]=Math.Clamp(v[i]/30,0,1);
+        var b=app.Sim.Brain;float[] v=[b.VisualRate,b.OlfactoryRate,b.MemoryRate,b.RewardRate,b.NavigationRate,b.Fear*30,b.DescendingRate,b.MotorRate,b.TasteRate];
+        for(int i=0;i<v.Length;i++)values[i,head]=Math.Clamp(MathF.Log2(1+v[i])/MathF.Log2(61),0,1);
         head=(head+1)%600;count=Math.Min(600,count+1);
     }
     protected override void OnPaint(PaintEventArgs e)
     {
-        base.OnPaint(e);var g=e.Graphics;using var label=Theme.Font(8);using var ink=new SolidBrush(Theme.Text);
-        float chartX=103,chartW=Width-114,cellW=chartW/600f;
+        base.OnPaint(e);var g=e.Graphics;using var label=Theme.Font(9);using var ink=new SolidBrush(Theme.Text);
+        float chartX=120,chartW=Width-131,cellW=chartW/600f,rowHeight=(Height-8)/9f,barHeight=Math.Max(10,rowHeight-6);
         for(int row=0;row<9;row++)
         {
-            float y=3+row*13.6f;g.DrawString(names[row],label,ink,6,y-2);
+            float y=4+row*rowHeight;g.DrawString(names[row],label,ink,8,y);
             for(int k=0;k<count;k++)
             {
                 int index=(head-count+k+600)%600;int intensity=Math.Clamp((int)(values[row,index]*63),0,63);
-                g.FillRectangle(palette[intensity],chartX+(600-count+k)*cellW,y,Math.Max(1,cellW+.2f),11);
+                g.FillRectangle(palette[intensity],chartX+(600-count+k)*cellW,y+1,Math.Max(1,cellW+.2f),barHeight);
             }
         }
         using var axis=new Pen(Color.FromArgb(65,186,192,164));g.DrawLine(axis,chartX+chartW-1,0,chartX+chartW-1,Height);
