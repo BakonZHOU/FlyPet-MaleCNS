@@ -24,8 +24,10 @@ static class SelfTest
         (float turn,float opto) ProbeTurn(float turn){var b=new Brain(data);var s=new Settings();b.SetInput(0,0,20,turn,.95f,0,s);for(int i=0;i<2000;i++)b.Step(1);return (b.Turn,b.OptomotorTurn);}
         var rightProbe=ProbeTurn(1);var leftProbe=ProbeTurn(-1);var centerProbe=ProbeTurn(0);
         Check("sided_neural_steering",rightProbe.opto>leftProbe.opto+.2f,new{rightDN=rightProbe.turn,leftDN=leftProbe.turn,centerDN=centerProbe.turn,rightOpto=rightProbe.opto,leftOpto=leftProbe.opto,centerOpto=centerProbe.opto});
+        var baselineEscape=new Brain(data);baselineEscape.SetInput(0,0,65,0,.95f,0,new Settings());for(int i=0;i<2000;i++)baselineEscape.Step(1);
+        Check("escape_output_requires_threat_context",baselineEscape.Fear<.001f,new{rawEscapeRate=baselineEscape.EscapeRate,effectiveFear=baselineEscape.Fear});
         var sim=Make();var start=sim.Position;Advance(sim,8);
-        Check("neural_flight_and_movement",Vector2.Distance(start,sim.Position)>80&&sim.Brain.Flight>.03f&&sim.Brain.TotalSpikes>100&&sim.Brain.Fear<.05f,new{distance=Vector2.Distance(start,sim.Position),flight=sim.Brain.Flight,fear=sim.Brain.Fear,spikes=sim.Brain.TotalSpikes,visual=sim.Brain.VisualRate,navigation=sim.Brain.NavigationRate,descending=sim.Brain.DescendingRate,motor=sim.Brain.MotorRate,flightRate=sim.Brain.FlightRate,wing=sim.Brain.WingRate,escapeRaw=sim.Brain.EscapeRate,turn=sim.Brain.Turn,optomotor=sim.Brain.OptomotorRate});
+        Check("neural_flight_and_movement",Vector2.Distance(start,sim.Position)>80&&sim.Brain.Flight>.03f&&sim.Brain.TotalSpikes>100,new{distance=Vector2.Distance(start,sim.Position),flight=sim.Brain.Flight,fear=sim.Brain.Fear,spikes=sim.Brain.TotalSpikes,visual=sim.Brain.VisualRate,navigation=sim.Brain.NavigationRate,descending=sim.Brain.DescendingRate,motor=sim.Brain.MotorRate,flightRate=sim.Brain.FlightRate,wing=sim.Brain.WingRate,escapeRaw=sim.Brain.EscapeRate,turn=sim.Brain.Turn,optomotor=sim.Brain.OptomotorRate});
         var noInput=Make(new(){SensoryGain=0});var start2=noInput.Position;Advance(noInput,8);
         Check("sensory_ablation_stops_flight",Vector2.Distance(start2,noInput.Position)<1&&noInput.Brain.TotalSpikes==0,new{distance=Vector2.Distance(start2,noInput.Position),spikes=noInput.Brain.TotalSpikes});
         var noSynapse=Make(new(){NeuralGain=0});Advance(noSynapse,8);
@@ -78,6 +80,14 @@ static class SelfTest
         var avoidLearner=new Brain(data);for(int frame=0;frame<240;frame++){avoidLearner.SetInput(0,0,25,0,.95f,.9f,learningSettings,wallTurn:1,positionX:.04f,positionY:.52f,punishment:1,frameDt:1f/120);for(int ms=0;ms<8;ms++)avoidLearner.Step(1);}
         avoidLearner.SetInput(0,0,25,0,.95f,0,learningSettings,positionX:.13f,positionY:.52f,frameDt:1f/120);
         Check("negative_memory_learns_edge_place",avoidLearner.AvoidanceConfidence>.1f&&avoidLearner.AvoidedX<.15f&&Math.Abs(avoidLearner.AvoidedY-.52f)<.15f&&avoidLearner.LocalAvoidanceConfidence>.1f&&avoidLearner.AvoidanceVectorX>0,new{confidence=avoidLearner.AvoidanceConfidence,local=avoidLearner.LocalAvoidanceConfidence,x=avoidLearner.AvoidedX,y=avoidLearner.AvoidedY,awayX=avoidLearner.AvoidanceVectorX});
+        float collisionRadiusX=150f/area.Width,collisionRadiusY=150f/area.Height;
+        var collisionRange=new Brain(data);collisionRange.LearnCollision(.5f,.027f,collisionRadiusX,collisionRadiusY,.22f);
+        collisionRange.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:.56f,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);float nearbyCollisionMemory=collisionRange.LocalAvoidanceConfidence;
+        collisionRange.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:.72f,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);float distantCollisionMemory=collisionRange.LocalAvoidanceConfidence;
+        Check("collision_memory_has_300px_diameter",nearbyCollisionMemory>.02f&&nearbyCollisionMemory>distantCollisionMemory*3,new{nearbyCollisionMemory,distantCollisionMemory,diameter=300});
+        var topCoverage=new Brain(data);for(int i=0;i<16;i++)topCoverage.LearnCollision((i+.5f)/16,.027f,collisionRadiusX,collisionRadiusY,.22f);
+        float weakestTopMemory=1;for(int i=0;i<32;i++){topCoverage.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:(i+.5f)/32,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);weakestTopMemory=Math.Min(weakestTopMemory,topCoverage.LocalAvoidanceConfidence);}
+        Check("sixteen_impacts_cover_top_edge",weakestTopMemory>.02f,new{impacts=16,weakestTopMemory,diameter=300});
         var freshLife=Make();freshLife.Brain.ImportMemory(avoidLearner.ExportMemory());freshLife.Revive(area);
         Check("new_fly_starts_with_blank_memory",freshLife.Brain.AvoidanceConfidence==0&&freshLife.Brain.MemoryConfidence==0,new{positive=freshLife.Brain.MemoryConfidence,negative=freshLife.Brain.AvoidanceConfidence});
         var albino=Make(new(){AlbinoChance=1,AlbinoSpeedMultiplier=1.5f});Check("albino_hidden_skin",albino.Albino&&albino.Health==albino.MaxHealth&&albino.MaxHealth==180);

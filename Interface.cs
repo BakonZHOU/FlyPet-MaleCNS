@@ -171,6 +171,7 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.MemoryDecayPerMinute),"位置记忆每分钟衰减",0,1,(decimal)s.MemoryDecayPerMinute,3);
         Num(nameof(s.SugarReward),"吃糖奖励信号",0,2,(decimal)s.SugarReward,2);
         Num(nameof(s.EdgePunishment),"撞击边缘负面信号",0,2,(decimal)s.EdgePunishment,2);
+        Num(nameof(s.CollisionMemoryDiameter),"单次撞击记忆直径（像素）",80,1200,(decimal)s.CollisionMemoryDiameter);
         Num(nameof(s.MaxSugar),"最多保留糖粒数",1,30,s.MaxSugar);
         scroll.Controls.Add(Theme.Label("桌宠所在显示器",8,y+4,300,32));
         monitor=new(){Location=new(335,y),Size=new(228,30),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};

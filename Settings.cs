@@ -33,6 +33,7 @@ public sealed class Settings
     public float MemoryDecayPerMinute { get; set; } = .002f;
     public float SugarReward { get; set; } = 1;
     public float EdgePunishment { get; set; } = .75f;
+    public float CollisionMemoryDiameter { get; set; } = 300;
     public int MaxSugar { get; set; } = 12;
     public int MonitorIndex { get; set; } = 0;
     public bool ShowMeters { get; set; } = false;
@@ -95,6 +96,7 @@ public sealed class Settings
         SatiatedThreshold=Safe(SatiatedThreshold,50,100,85);SatiatedRegenPerSecond=Safe(SatiatedRegenPerSecond,0,20,1.5f);
         LearningRate=Safe(LearningRate,0,2,.18f);MemoryDecayPerMinute=Safe(MemoryDecayPerMinute,0,1,.002f);
         SugarReward=Safe(SugarReward,0,2,1);EdgePunishment=Safe(EdgePunishment,0,2,.75f);
+        CollisionMemoryDiameter=Safe(CollisionMemoryDiameter,80,1200,300);
         MonitorIndex = Math.Max(0, MonitorIndex);
     }
     public void Save()

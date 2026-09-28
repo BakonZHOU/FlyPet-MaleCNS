@@ -143,8 +143,10 @@ public sealed class Simulation
         bool resting=Settings.RestEnabled&&RestRemaining>0&&threat<.02f&&Alarm<.01f;
         float travel=contact||resting?0:.95f;
         float px=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),py=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
+        float memoryRadius=Settings.CollisionMemoryDiameter*.5f;
+        float memoryRadiusX=memoryRadius/Math.Max(1,area.Width),memoryRadiusY=memoryRadius/Math.Max(1,area.Height);
         Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),contact?1:0,Fullness,Math.Clamp(threat>.02f?escapeTurn:delta,-1,1),travel,wall,Settings,
-            odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt);
+            odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt,memoryRadiusX,memoryRadiusY,false);
         neuralRemainder+=dt;
         while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain);neuralRemainder-=.001f;}
         if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!contact&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
@@ -162,7 +164,12 @@ public sealed class Simulation
         var direction=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));
         Velocity=Vector2.Lerp(Velocity,direction*speed,1-MathF.Exp(-8*dt));Position+=Velocity*dt;
         bool collided=ClampPosition(area);
-        if(collided){edgeShock=1;punishmentPulse=1;Alarm=Math.Max(Alarm,.45f);RestRemaining=0;EdgeCollisions++;}
+        if(collided)
+        {
+            edgeShock=1;punishmentPulse=1;Alarm=Math.Max(Alarm,.45f);RestRemaining=0;EdgeCollisions++;
+            float collisionX=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),collisionY=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
+            Brain.LearnCollision(collisionX,collisionY,memoryRadiusX,memoryRadiusY,Math.Max(.14f,Settings.LearningRate*Settings.EdgePunishment*1.5f));
+        }
         bool ate=false,feeding=false;
         if(contact&&food!=null)
         {

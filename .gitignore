@@ -13,5 +13,6 @@ test-results-lifecycle*/
 test-results-final-*/
 test-results-size-*/
 test-results-escape-*/
+test-results-collision-*/
 packaged-self-test*/
 *.user

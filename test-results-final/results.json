@@ -57,22 +57,30 @@
       }
     },
     {
+      "name": "escape_output_requires_threat_context",
+      "passed": true,
+      "detail": {
+        "rawEscapeRate": 31.475054,
+        "effectiveFear": 0
+      }
+    },
+    {
       "name": "neural_flight_and_movement",
       "passed": true,
       "detail": {
-        "distance": 223.85365,
-        "flight": 0.71703565,
+        "distance": 367.37994,
+        "flight": 0.94626343,
         "fear": 0,
-        "spikes": 95589,
-        "visual": 11.057166,
-        "navigation": 3.636259E-18,
-        "descending": 0.85305977,
-        "motor": 1.1997313,
-        "flightRate": 5.963106E-18,
-        "wing": 9.762197,
-        "escapeRaw": 42.70941,
+        "spikes": 88659,
+        "visual": 12.705267,
+        "navigation": 5.675198E-19,
+        "descending": 1.0918005,
+        "motor": 1.6830893,
+        "flightRate": 9.51749E-19,
+        "wing": 12.86823,
+        "escapeRaw": 54.419235,
         "turn": 0,
-        "optomotor": 36.254692
+        "optomotor": 44.091995
       }
     },
     {
@@ -87,7 +95,7 @@
       "name": "connectome_is_required_for_motor_output",
       "passed": true,
       "detail": {
-        "connectedSpikes": 95589,
+        "connectedSpikes": 88659,
         "severedSpikes": 30350,
         "severedDistance": 0,
         "severedFlight": 0
@@ -116,14 +124,14 @@
       "name": "remote_sugar_attraction",
       "passed": true,
       "detail": {
-        "fullness": 51.551342,
+        "fullness": 51.551548,
         "distance": 0,
-        "x": 1115.3071,
-        "y": 360.66696,
-        "heading": 1.1476035,
-        "turn": -1E-45,
-        "opto": 58.500595,
-        "flight": 0.76448643
+        "x": 1299.3219,
+        "y": 485.69263,
+        "heading": -0.042573515,
+        "turn": 2.595689E-15,
+        "opto": 47.650803,
+        "flight": 0.8790122
       }
     },
     {
@@ -133,7 +141,7 @@
         "smellFrames": 547,
         "noSmellFrames": 960,
         "smellDistance": 0,
-        "noSmellDistance": 1120.6849,
+        "noSmellDistance": 1085.3376,
         "olfactory": 13.462205
       }
     },
@@ -142,7 +150,7 @@
       "passed": true,
       "detail": {
         "before": 60,
-        "after": 165.51964,
+        "after": 166.39815,
         "fear": 1
       }
     },
@@ -163,7 +171,7 @@
         "urgency": 1,
         "distanceRate": 0,
         "rapidTurn": true,
-        "speed": 2117.9055
+        "speed": 2105.117
       }
     },
     {
@@ -250,7 +258,7 @@
         "health": 100,
         "collisions": 1,
         "reward": -1,
-        "wall": 0.8281153
+        "wall": 0.8273378
       }
     },
     {
@@ -267,10 +275,28 @@
       "passed": true,
       "detail": {
         "confidence": 0.3143075,
-        "local": 1,
+        "local": 0.6443683,
         "x": 0.03125,
         "y": 0.5416667,
-        "awayX": 0.9931536
+        "awayX": 0.92674994
+      }
+    },
+    {
+      "name": "collision_memory_has_300px_diameter",
+      "passed": true,
+      "detail": {
+        "nearbyCollisionMemory": 0.16883993,
+        "distantCollisionMemory": 0,
+        "diameter": 300
+      }
+    },
+    {
+      "name": "sixteen_impacts_cover_top_edge",
+      "passed": true,
+      "detail": {
+        "impacts": 16,
+        "weakestTopMemory": 0.35899845,
+        "diameter": 300
       }
     },
     {
@@ -295,7 +321,7 @@
       "name": "flight_consumes_fullness",
       "passed": true,
       "detail": {
-        "flying": 19.949139,
+        "flying": 19.949383,
         "zeroFlightCost": 20
       }
     },
@@ -317,8 +343,8 @@
       "passed": true,
       "detail": {
         "simulatedSeconds": 30,
-        "wallSeconds": 1.9232324,
-        "realtimeFactor": 15.598738873159583,
+        "wallSeconds": 2.039003,
+        "realtimeFactor": 14.713073006758695,
         "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD"
       }
     },
@@ -326,7 +352,7 @@
       "name": "render_budget_90fps",
       "passed": true,
       "detail": {
-        "averageMs": 1.1249446666666667
+        "averageMs": 1.0592533333333334
       }
     }
   ]

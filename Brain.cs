@@ -127,7 +127,8 @@ public sealed class Brain
     }
     public void Reset(){Array.Fill(voltage,-52);Array.Clear(current);Array.Clear(rates);Array.Clear(drive);Array.Clear(adaptation);foreach(var d in delayed)Array.Clear(d);Array.Clear(refractory);delaySlot=0;Flight=Fear=Feeding=Turn=OdorTurn=NavigationTurn=DescendingTurn=RewardSignal=0;}
     public void SetInput(float threat,float contact,float fullness,float turn,float travel,float wall,Settings s,
-        float odor=0,float odorTurn=0,float wallTurn=0,float positionX=.5f,float positionY=.5f,float reward=0,float punishment=0,float frameDt=1f/120)
+        float odor=0,float odorTurn=0,float wallTurn=0,float positionX=.5f,float positionY=.5f,float reward=0,float punishment=0,float frameDt=1f/120,
+        float avoidanceRadiusX=.12f,float avoidanceRadiusY=.12f,bool learnPunishment=true)
     {
         Array.Clear(drive);
         void Add(int[] ids,float v){foreach(int i in ids)drive[i]+=v*s.SensoryGain;}
@@ -149,7 +150,8 @@ public sealed class Brain
         Add(groups["taste"],contact*14);
         Add(rewardStim,Math.Clamp(Math.Abs(reward-punishment)*20,0,24));
         float decay=MathF.Exp(-Math.Max(0,s.MemoryDecayPerMinute)/60*frameDt);
-        float valence=Math.Clamp(reward*s.SugarReward-punishment*s.EdgePunishment,-1,1);RewardSignal=valence;
+        float valence=Math.Clamp(reward*s.SugarReward-(learnPunishment?punishment*s.EdgePunishment:0),-1,1);
+        RewardSignal=Math.Clamp(reward*s.SugarReward-punishment*s.EdgePunishment,-1,1);
         for(int k=0;k<placeCells.Length;k++)
         {
             float dx=positionX-placeX[k],dy=positionY-placeY[k];float activation=MathF.Exp(-(dx*dx+dy*dy)/.018f);placeActivity[k]=activation;
@@ -158,7 +160,7 @@ public sealed class Brain
             // strengthen it, so frequency matters instead of one event saturating memory.
             placeValue[k]=Math.Clamp(placeValue[k]*decay+activation*valence*s.LearningRate*frameDt*1.2f,-1,1);
         }
-        UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY);
+        UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY,avoidanceRadiusX,avoidanceRadiusY);
     }
     public void Step(float gain)
     {
@@ -212,18 +214,30 @@ public sealed class Brain
         if(worstIndex>=0){AvoidedX=placeX[worstIndex];AvoidedY=placeY[worstIndex];}
         MemoryConfidence=Math.Clamp(best,0,1);AvoidanceConfidence=Math.Clamp(-worst,0,1);
     }
-    void UpdateLocalAvoidance(float positionX,float positionY)
+    void UpdateLocalAvoidance(float positionX,float positionY,float radiusX,float radiusY)
     {
+        radiusX=Math.Max(.001f,radiusX);radiusY=Math.Max(.001f,radiusY);
         float x=0,y=0,total=0;
         for(int i=0;i<placeValue.Length;i++)if(placeValue[i]<0)
         {
-            float dx=positionX-placeX[i],dy=positionY-placeY[i],d2=dx*dx+dy*dy;
+            float dx=positionX-placeX[i],dy=positionY-placeY[i],scaledX=dx/radiusX,scaledY=dy/radiusY,d2=scaledX*scaledX+scaledY*scaledY;
             if(d2<.000001f)continue;
-            float influence=-placeValue[i]*MathF.Exp(-d2/.028f),inverse=1/MathF.Sqrt(d2);
-            x+=dx*inverse*influence;y+=dy*inverse*influence;total+=influence;
+            if(d2>4)continue;
+            float scaledLength=MathF.Sqrt(d2),influence=-placeValue[i]*MathF.Exp(-2.3f*d2);
+            x+=scaledX/scaledLength*influence;y+=scaledY/scaledLength*influence;total+=influence;
         }
         float length=MathF.Sqrt(x*x+y*y);if(length>.0001f){AvoidanceVectorX=x/length;AvoidanceVectorY=y/length;}else AvoidanceVectorX=AvoidanceVectorY=0;
         LocalAvoidanceConfidence=Math.Clamp(total,0,1);
+    }
+    public void LearnCollision(float positionX,float positionY,float radiusX,float radiusY,float strength)
+    {
+        radiusX=Math.Max(.001f,radiusX);radiusY=Math.Max(.001f,radiusY);strength=Math.Clamp(strength,0,1);
+        for(int i=0;i<placeValue.Length;i++)
+        {
+            float dx=(positionX-placeX[i])/radiusX,dy=(positionY-placeY[i])/radiusY,d2=dx*dx+dy*dy;
+            if(d2<=1)placeValue[i]=Math.Clamp(placeValue[i]-strength*MathF.Exp(-1.35f*d2),-1,1);
+        }
+        UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY,radiusX,radiusY);
     }
     public float[] ExportMemory()=>(float[])placeValue.Clone();
     public void ImportMemory(float[] values)
