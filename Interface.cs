@@ -184,11 +184,26 @@ public sealed class SettingsWindow : Form
         edge=Check("屏幕边缘视觉输入",s.EdgeSensing);neuralSteering=Check("神经转向读出（关闭为直接规则对照）",s.NeuralSteering);
         rest=Check("允许停歇",s.RestEnabled);
         scroll.Controls.Add(Theme.Label("饱腹 100 = 吃饱，0 = 饥饿；飞行会额外消耗。\n感觉编码与身体解码是工程模型，不是活体参数。",8,y+6,550,84,9,Theme.Muted));
-        Controls.Add(Theme.Button("应用设置",22,555,180,Apply,true));Controls.Add(Theme.Button("打开配置目录",218,555,185,()=>Process.Start(new ProcessStartInfo(Settings.Folder){UseShellExecute=true})));
+        Controls.Add(Theme.Button("应用设置",22,555,140,Apply,true));
+        Controls.Add(Theme.Button("恢复默认",174,555,140,ResetDefaults));
+        Controls.Add(Theme.Button("配置目录",326,555,140,()=>Process.Start(new ProcessStartInfo(Settings.Folder){UseShellExecute=true})));
         // Closing the settings window commits the edited values as well, so an accidental
         // click on the window X cannot make a change appear to be ignored.
-        Controls.Add(Theme.Button("关闭",419,555,205,Apply));
+        Controls.Add(Theme.Button("关闭",478,555,150,Apply));
         Controls.Add(Theme.Label("修改 JSON 后从托盘选择「重新加载配置」。",24,615,590,26,9,Theme.Muted));ResumeLayout(false);
+    }
+    void ResetDefaults()
+    {
+        var defaults=new Settings();
+        foreach(var (name,n) in numbers)
+        {
+            var value=typeof(Settings).GetProperty(name)!.GetValue(defaults)!;
+            n.Value=Math.Clamp(Convert.ToDecimal(value),n.Minimum,n.Maximum);
+        }
+        monitor.SelectedIndex=Math.Min(defaults.MonitorIndex,monitor.Items.Count-1);
+        meters.Checked=defaults.ShowMeters;startup.Checked=defaults.StartWithWindows;launch.Checked=defaults.ShowLaunchMenu;pauseHidden.Checked=defaults.PauseWhenHidden;
+        invincible.Checked=defaults.Invincible;edge.Checked=defaults.EdgeSensing;neuralSteering.Checked=defaults.NeuralSteering;rest.Checked=defaults.RestEnabled;
+        Apply();
     }
     void Apply()
     {

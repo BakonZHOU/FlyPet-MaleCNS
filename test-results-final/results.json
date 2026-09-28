@@ -343,8 +343,8 @@
       "passed": true,
       "detail": {
         "simulatedSeconds": 30,
-        "wallSeconds": 2.039003,
-        "realtimeFactor": 14.713073006758695,
+        "wallSeconds": 2.1937477,
+        "realtimeFactor": 13.675228012774669,
         "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD"
       }
     },
@@ -352,7 +352,7 @@
       "name": "render_budget_90fps",
       "passed": true,
       "detail": {
-        "averageMs": 1.0592533333333334
+        "averageMs": 1.0776103333333333
       }
     }
   ]
