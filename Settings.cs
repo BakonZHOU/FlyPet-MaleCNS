@@ -10,6 +10,8 @@ public sealed class Settings
     public int PetSize { get; set; } = 90;
     public float FlightSpeed { get; set; } = 400;
     public float FearRadius { get; set; } = 250;
+    public float EscapeSafeRadiusMultiplier { get; set; } = 1.35f;
+    public float EscapeAccelerationGain { get; set; } = 1.4f;
     public float SwatDamage { get; set; } = 40;
     public float HungerPerMinute { get; set; } = .8f;
     public float FlightFullnessCostPerSecond { get; set; } = .008f;
@@ -80,6 +82,7 @@ public sealed class Settings
     {
         FramesPerSecond = Math.Clamp(FramesPerSecond, 20, 120); PetSize = Math.Clamp(PetSize, MinPetSize, MaxPetSize);
         FlightSpeed = Safe(FlightSpeed, 30, 900,400); FearRadius = Safe(FearRadius,80,800,250);
+        EscapeSafeRadiusMultiplier=Safe(EscapeSafeRadiusMultiplier,1,2.5f,1.35f);EscapeAccelerationGain=Safe(EscapeAccelerationGain,0,4,1.4f);
         FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.008f);
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);
         SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,.8f);

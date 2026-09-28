@@ -149,6 +149,8 @@ public sealed class SettingsWindow : Form
         Num(nameof(s.PetSize),"苍蝇显示大小（像素）",Settings.MinPetSize,Settings.MaxPetSize,s.PetSize);
         Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,900,(decimal)s.FlightSpeed);
         Num(nameof(s.FearRadius),"鼠标威胁感知范围（像素）",80,800,(decimal)s.FearRadius);
+        Num(nameof(s.EscapeSafeRadiusMultiplier),"解除逃逸所需安全距离倍率",1,2.5m,(decimal)s.EscapeSafeRadiusMultiplier,2);
+        Num(nameof(s.EscapeAccelerationGain),"持续逃逸额外加速倍率",0,4,(decimal)s.EscapeAccelerationGain,2);
         Num(nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
         Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,2);
         Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,3);

@@ -2,7 +2,7 @@
 
 Windows 10/11 x64 独立桌宠，放在 `FlyPet/`，与原来的 `FlyBrain/`、总界面和其他分区分开。双击 `dist/FlyPet.exe` 即可使用；便携 EXE 自带 .NET 运行时，正常运行无需 Python、联网或 GPU。
 
-程序启动后直接放飞苍蝇，不再弹出启动控制中心。需要控制中心时，在右下角托盘图标右键选择“启动菜单”；设置窗口也从托盘进入。托盘菜单还包括投放糖、显示状态条、无敌模式、立即复活、大脑活动图、隐藏和退出。没有左下角控制栏，也没有苍蝇拍切换模式。苍蝇一直把靠近的鼠标当作威胁并躲避；普通桌面点击穿透，直接点到苍蝇时才会击中它。托盘图标悬停文字显示生命与饱腹百分比。
+程序启动后直接放飞苍蝇，不再弹出启动控制中心。需要控制中心时，在右下角托盘图标右键选择“启动菜单”；设置窗口也从托盘进入。托盘菜单还包括投放糖、显示状态条、无敌模式、立即复活、大脑活动图、隐藏和退出。没有左下角控制栏，也没有苍蝇拍切换模式。苍蝇一直把靠近的鼠标当作威胁并躲避；普通桌面点击穿透，直接点到苍蝇时才会击中它。逃逸采用距离闭环：距离误差、持续时间和距离变化率共同形成逃逸紧迫度；无法拉开距离会继续加速并触发短促急转，稳定超过安全半径后才解除。托盘图标悬停文字显示生命与饱腹百分比。
 
 生命降到零后，苍蝇会变成自己绘制的低多边形血污泥与断翅，随机等待 12–40 秒复活；托盘的“立即复活”跳过等待。无敌模式下拍打仍会让它短暂警觉、加速逃跑，但不扣血。被击中后的较小速度增益持续到下一次复活。飞行消耗额外饱腹值；达到饱腹阈值后会逐渐回血。糖需要持续接触并由进食回路保持激活一段时间才会吃完。饱腹度、糖、威胁和休息共同影响感觉输入及飞行欲望。屏幕边缘进入视觉运动回路；真实撞到边界时会物理反弹、不掉血，并产生负面奖励以降低该位置的记忆价值。它会短暂停歇，振翅停止。绘制目标 90 FPS，可在 20–120 FPS 间调整。
 
@@ -35,7 +35,7 @@ cd 'E:\Workspace2\project2(brain)'
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90）、`FlightSpeed`（默认 400）、`HungerPerMinute`（默认 0.8）、`FlightFullnessCostPerSecond`（默认 0.008）、`SugarEatingSeconds`（默认 1.8 秒）、`SatiatedThreshold`（默认 85）、`SatiatedRegenPerSecond`（默认每秒 1.5）、`AlarmSeconds`、`AlbinoChance`（默认 0.1）、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。默认从 65 饱腹出生，即使按持续飞行的上限估算也能活约一小时；登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90，允许 60–800）、`FlightSpeed`（默认 400）、`FearRadius`、`EscapeSafeRadiusMultiplier`（默认 1.35）、`EscapeAccelerationGain`（默认 1.4）、`HungerPerMinute`（默认 0.8）、`FlightFullnessCostPerSecond`（默认 0.008）、`SugarEatingSeconds`（默认 1.8 秒）、`SatiatedThreshold`（默认 85）、`SatiatedRegenPerSecond`（默认每秒 1.5）、`AlarmSeconds`、`AlbinoChance`（默认 0.1）、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。默认从 65 饱腹出生，即使按持续飞行的上限估算也能活约一小时；登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 

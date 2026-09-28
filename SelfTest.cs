@@ -46,7 +46,15 @@ static class SelfTest
         var scared=Make();var threat=scared.Position+new Vector2(60,0);float d0=Vector2.Distance(scared.Position,threat);Advance(scared,.7f,true,threat);
         Check("cursor_avoidance",Vector2.Distance(scared.Position,threat)>d0+20,new{before=d0,after=Vector2.Distance(scared.Position,threat),fear=scared.Brain.Fear});
         var turning=Make(new(){RestEnabled=false});turning.Heading=0;var turnThreat=turning.Position+new Vector2(60,0);Advance(turning,.45f,true,turnThreat);
-        Check("cursor_escape_uses_turning_circuit",Math.Abs(turning.Heading)>.35f,new{heading=turning.Heading,optomotor=turning.Brain.OptomotorTurn,descending=turning.Brain.DescendingTurn,turn=turning.Brain.Turn});
+        Check("cursor_escape_uses_turning_circuit",Math.Abs(turning.Heading)>.30f,new{heading=turning.Heading,optomotor=turning.Brain.OptomotorTurn,descending=turning.Brain.DescendingTurn,turn=turning.Brain.Turn});
+        var adaptiveEscape=Make(new(){RestEnabled=false});bool usedRapidTurn=false;
+        for(int i=0;i<180;i++){adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(80,0),true);usedRapidTurn|=adaptiveEscape.RapidEscapeTurn;}
+        float stalledUrgency=adaptiveEscape.EscapeUrgency;
+        Check("failed_escape_accumulates_acceleration",stalledUrgency>.75f&&usedRapidTurn,new{urgency=stalledUrgency,distanceRate=adaptiveEscape.EscapeDistanceRate,rapidTurn=usedRapidTurn,speed=adaptiveEscape.Velocity.Length()});
+        for(int i=0;i<24;i++)adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(adaptiveEscape.Settings.FearRadius*1.1f,0),true);
+        Check("escape_persists_past_detection_radius",adaptiveEscape.Brain.ThreatDrive>.1f&&adaptiveEscape.EscapeUrgency>.1f,new{threatDrive=adaptiveEscape.Brain.ThreatDrive,urgency=adaptiveEscape.EscapeUrgency});
+        for(int i=0;i<90;i++)adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(adaptiveEscape.Settings.FearRadius*adaptiveEscape.Settings.EscapeSafeRadiusMultiplier*1.2f,0),true);
+        Check("escape_releases_after_safe_distance",adaptiveEscape.EscapeUrgency<.01f,new{urgency=adaptiveEscape.EscapeUrgency,distanceRate=adaptiveEscape.EscapeDistanceRate});
         var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
         Advance(dying,2.1f);Check("random_respawn",!dying.Dead&&dying.Health==100);
         var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead);

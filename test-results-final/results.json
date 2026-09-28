@@ -142,18 +142,44 @@
       "passed": true,
       "detail": {
         "before": 60,
-        "after": 473.86465,
-        "fear": 0.9521611
+        "after": 165.51964,
+        "fear": 1
       }
     },
     {
       "name": "cursor_escape_uses_turning_circuit",
       "passed": true,
       "detail": {
-        "heading": -0.5864018,
-        "optomotor": -1,
-        "descending": -0.0066846954,
+        "heading": -0.3422205,
+        "optomotor": -0.5414042,
+        "descending": -0.006132488,
         "turn": 0
+      }
+    },
+    {
+      "name": "failed_escape_accumulates_acceleration",
+      "passed": true,
+      "detail": {
+        "urgency": 1,
+        "distanceRate": 0,
+        "rapidTurn": true,
+        "speed": 2117.9055
+      }
+    },
+    {
+      "name": "escape_persists_past_detection_radius",
+      "passed": true,
+      "detail": {
+        "threatDrive": 0.92,
+        "urgency": 1
+      }
+    },
+    {
+      "name": "escape_releases_after_safe_distance",
+      "passed": true,
+      "detail": {
+        "urgency": 0,
+        "distanceRate": 0
       }
     },
     {
@@ -291,8 +317,8 @@
       "passed": true,
       "detail": {
         "simulatedSeconds": 30,
-        "wallSeconds": 1.7849676,
-        "realtimeFactor": 16.80702775781476,
+        "wallSeconds": 1.9232324,
+        "realtimeFactor": 15.598738873159583,
         "processor": "AMD64 Family 26 Model 36 Stepping 0, AuthenticAMD"
       }
     },
@@ -300,7 +326,7 @@
       "name": "render_budget_90fps",
       "passed": true,
       "detail": {
-        "averageMs": 1.0841276666666666
+        "averageMs": 1.1249446666666667
       }
     }
   ]
