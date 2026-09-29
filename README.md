@@ -68,7 +68,7 @@ python .\windows\tools\verify_source.py --hash-weights
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可调大小，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类，当前栏目会高亮。外观包括两种皮肤、尺寸和稀有概率；生存包括饱腹消耗、饥饿失血与复活时间。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。高级使用者可把符合 `windows/Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可以缩放且不再强制置顶，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类。桌宠初始饱食度为 100；默认饱食消耗已降低，无敌模式会始终保持满饱食。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。Windows 版已内置瞬机起手、命中与铜头铁臂成功音效，使用独立音频声部避免连续触发时互相截断，并保持音频设备预热。音频驱动操作在动画线程之外完成，铜头铁臂强化闪光、振翅和音效始终开启；招式结束后只保留约 0.1 秒无敌缓冲。若要临时替换，可将 WAV 放到同一配置目录，命名为 `evanescence.wav` 与 `rock-solid.wav`；前者替换瞬机整组音效，后者替换铜头铁臂音效。高级使用者可把符合 `windows/Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command skin cockroach`、`--command skin fly`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 

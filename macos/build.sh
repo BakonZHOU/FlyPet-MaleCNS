@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"; VERSION="${VERSION:-1.1.4}"; ARCHS="${ARCHS:-arm64 x86_64}"; BUILD="$ROOT/.build/macos"; RELEASE="$ROOT/releases/latest"; WINDOWS="$ROOT/windows"; APP="$BUILD/FlyPet.app"; CONTENTS="$APP/Contents"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; VERSION="${VERSION:-1.1.11}"; ARCHS="${ARCHS:-arm64 x86_64}"; BUILD="$ROOT/.build/macos"; RELEASE="$ROOT/releases/latest"; WINDOWS="$ROOT/windows"; APP="$BUILD/FlyPet.app"; CONTENTS="$APP/Contents"
 rm -rf "$BUILD"; mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$BUILD/bin" "$BUILD/dmg" "$RELEASE"
 cp "$ROOT/macos/Info.plist" "$CONTENTS/Info.plist"; cp "$ROOT/README.md" "$CONTENTS/Resources/使用说明.md"; cp "$WINDOWS/THIRD_PARTY.md" "$CONTENTS/Resources/THIRD_PARTY.md"; cp "$WINDOWS/Assets/circuit.json" "$CONTENTS/Resources/circuit.json"
 swift "$ROOT/macos/make_icon.swift" "$BUILD/FlyPet.iconset"; iconutil -c icns "$BUILD/FlyPet.iconset" -o "$CONTENTS/Resources/FlyPet.icns"

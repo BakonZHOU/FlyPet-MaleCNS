@@ -3,7 +3,10 @@
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest><AssemblyName>FlyPet</AssemblyName>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Version>1.0.0</Version>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Version>1.1.11</Version><AssemblyVersion>1.1.11.0</AssemblyVersion><FileVersion>1.1.11.0</FileVersion>
   </PropertyGroup>
-  <ItemGroup><EmbeddedResource Include="Assets/circuit.json" /></ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets/circuit.json" />
+    <EmbeddedResource Include="Assets/Audio/*.wav" />
+  </ItemGroup>
 </Project>

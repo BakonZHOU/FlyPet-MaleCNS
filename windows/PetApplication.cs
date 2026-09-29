@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Drawing.Imaging;
+using System.Drawing.Drawing2D;
 using System.Numerics;
 using System.Text.Json;
 
@@ -29,6 +30,13 @@ public sealed class PetApplication : ApplicationContext
     readonly LayerWindow pet,cursor,speech;
     readonly List<LayerWindow> sugarWindows=[];
     readonly FlyRenderer renderer=new();
+    readonly AbilitySound abilitySound=new();
+    readonly List<GhostFrame> ghostFrames=[];
+    float nextGhostProgress;
+    readonly record struct GhostFrame(Bitmap Image,Vector2 Position,float Progress);
+    double slowMouseUntil;
+    Point slowedMouse;
+    float mouseFractionX,mouseFractionY;
     readonly NotifyIcon tray;
     readonly ToolStripMenuItem flySkinItem,roachSkinItem;
     readonly Icon icon;
@@ -75,7 +83,7 @@ public sealed class PetApplication : ApplicationContext
         more.DropDownItems.Add("大脑活动图…",null,(_,_)=>Defer(ShowBrainMap));
         more.DropDownItems.Add("重新加载配置",null,(_,_)=>ReloadSettings());menu.Items.Add("退出 FlyPet",null,(_,_)=>ExitThread());
         tray=new NotifyIcon{Icon=icon,Text="FlyPet · 桌宠",ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(_,_)=>ShowDashboard();
-        mouseHook=new(OnMouseDown);
+        mouseHook=new(OnMouseDown,OnMouseMove);
         Native.timeBeginPeriod(1);timer.Interval=TimerInterval();timer.Tick+=Tick;timer.Start();
         if(quiet||!Settings.ShowLaunchMenu)StartPet();else ShowDashboard();
         if(Settings.LoadWarning!=null)tray.ShowBalloonTip(5000,"FlyPet",Settings.LoadWarning,ToolTipIcon.Warning);
@@ -122,7 +130,7 @@ public sealed class PetApplication : ApplicationContext
             case "sugar-mode":StartPet();SetMode(ToolMode.Sugar);break;
             case "normal":SetMode(ToolMode.Normal);break;
             case "drop":Sim.AddSugar(PointArg());break;
-            case "swat":Sim.Hit(PointArg());break;
+            case "swat":Sim.Hit(PointArg(),false);break;
             case "recall":Sim.Recenter(Area);break;
             case "revive":Sim.Revive(Area);break;
             case "invincible":Settings.Invincible=args.Length<2||args[1]=="on";Settings.Save();break;
@@ -140,7 +148,7 @@ public sealed class PetApplication : ApplicationContext
     public void ShowSettings(){SetMode(ToolMode.Normal);if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new(this);settingsWindow.Show();settingsWindow.WindowState=FormWindowState.Normal;settingsWindow.BringToFront();settingsWindow.Activate();}
     public void SelectSkin(PetSkin skin)
     {
-        Sim.ChangeSkin(skin);Settings.Save();dashboard.RefreshSkin();
+        Sim.ChangeSkin(skin);ClearGhosts();Settings.Save();dashboard.RefreshSkin();
         settingsWindow?.SyncSkin(skin);
         deathMenu?.SetSkin(skin);
         flySkinItem.Checked=skin==PetSkin.Fly;roachSkinItem.Checked=skin==PetSkin.Cockroach;
@@ -163,10 +171,20 @@ public sealed class PetApplication : ApplicationContext
         if(!visible||Paused)return false;
         if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p))||(deathMenu?.Visible==true&&deathMenu.Bounds.Contains(p)))return false;
         if(tray.ContextMenuStrip?.Visible==true||!Area.Contains(p))return false;
-        if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Sim.DisplaySize*.55f+18)
+        if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Sim.HitRadius)
         {pendingClick=p;pendingMode=ToolMode.Swatter;return true;}
         if(Mode==ToolMode.Sugar){pendingClick=p;pendingMode=ToolMode.Sugar;return true;}
         return false;
+    }
+    Point? OnMouseMove(Point p)
+    {
+        if(clock.Elapsed.TotalSeconds>=slowMouseUntil)return null;
+        float x=(p.X-slowedMouse.X)*.27f+mouseFractionX;
+        float y=(p.Y-slowedMouse.Y)*.27f+mouseFractionY;
+        int dx=(int)MathF.Truncate(x),dy=(int)MathF.Truncate(y);
+        mouseFractionX=x-dx;mouseFractionY=y-dy;
+        slowedMouse=new(slowedMouse.X+dx,slowedMouse.Y+dy);
+        return slowedMouse;
     }
     void Tick(object? sender,EventArgs e)
     {
@@ -175,7 +193,24 @@ public sealed class PetApplication : ApplicationContext
         if(pendingClick is Point click)
         {
             pendingClick=null;var p=new Vector2(click.X,click.Y);
-            if(pendingMode==ToolMode.Sugar){Sim.AddSugar(p);SetMode(ToolMode.Normal);}else if(pendingMode==ToolMode.Swatter)Sim.Hit(p);
+            if(pendingMode==ToolMode.Sugar){Sim.AddSugar(p);SetMode(ToolMode.Normal);}
+            else if(pendingMode==ToolMode.Swatter)
+            {
+                int serial=Sim.DefenseSerial;
+                Sim.Hit(p);
+                if(Sim.DefenseSerial!=serial)
+                {
+                    abilitySound.Play(Sim.Defense);
+                    ClearGhosts();
+                    if(Sim.Defense==DefenseMove.Evanescence)
+                    {
+                        ghostFrames.Add(new(renderer.CaptureAfterimage(Sim,Area),Sim.Position,0));
+                        nextGhostProgress=.13f;
+                        slowedMouse=Control.MousePosition;mouseFractionX=mouseFractionY=0;
+                        slowMouseUntil=clock.Elapsed.TotalSeconds+.6;
+                    }
+                }
+            }
         }
         var cost=Stopwatch.StartNew();float advanced=0;
         if(!Paused&&(visible||!Settings.PauseWhenHidden))
@@ -207,6 +242,7 @@ public sealed class PetApplication : ApplicationContext
     void Draw()
     {
         int size=Sim.DisplaySize;
+        if(Sim.Defense!=DefenseMove.Evanescence&&ghostFrames.Count>0)ClearGhosts();
         while(sugarWindows.Count<Sim.Sugars.Count){var w=new LayerWindow(48,"FlyPet · 糖粒");sugarWindows.Add(w);}
         while(sugarWindows.Count>Sim.Sugars.Count){sugarWindows[^1].Dispose();sugarWindows.RemoveAt(sugarWindows.Count-1);}
         for(int i=0;i<Sim.Sugars.Count;i++)
@@ -218,7 +254,8 @@ public sealed class PetApplication : ApplicationContext
         else
         {
             if(!pet.Visible)pet.Show();
-            pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));
+            if(Sim.Defense==DefenseMove.Evanescence)DrawDodgeComposite(size);
+            else pet.Render((int)Sim.Position.X-size/2,(int)Sim.Position.Y-size/2,size,g=>renderer.Draw(g,new(0,0,size,size),Sim,Area,Settings.ShowMeters));
             bool uiOpen=tray.ContextMenuStrip?.Visible==true||dashboard.Visible||settingsWindow?.Visible==true||evidenceWindow?.Visible==true||brainMap?.Visible==true||deathMenu?.Visible==true;
             if(!uiOpen)pet.BringToFront();
         }
@@ -245,6 +282,36 @@ public sealed class PetApplication : ApplicationContext
             });
         }
     }
+    void DrawDodgeComposite(int size)
+    {
+        float progress=Math.Clamp(Sim.DefenseProgress,0,1);
+        if(progress>=nextGhostProgress&&ghostFrames.Count<7)
+        {
+            ghostFrames.Add(new(renderer.CaptureAfterimage(Sim,Area),Sim.Position,progress));
+            nextGhostProgress+=.13f;
+        }
+        int left=(int)MathF.Floor(MathF.Min(Sim.DefenseOrigin.X,Sim.DefenseDestination.X)-size*.62f);
+        int top=(int)MathF.Floor(MathF.Min(Sim.DefenseOrigin.Y,Sim.DefenseDestination.Y)-size*.62f);
+        int right=(int)MathF.Ceiling(MathF.Max(Sim.DefenseOrigin.X,Sim.DefenseDestination.X)+size*.62f);
+        int bottom=(int)MathF.Ceiling(MathF.Max(Sim.DefenseOrigin.Y,Sim.DefenseDestination.Y)+size*.62f);
+        pet.Render(left,top,right-left,bottom-top,g=>
+        {
+            // A single layered window defines the draw order on every Windows setup.
+            g.InterpolationMode=InterpolationMode.NearestNeighbor;
+            foreach(var frame in ghostFrames)
+            {
+                using var attributes=new ImageAttributes();
+                float age=Math.Max(0,progress-frame.Progress);
+                var matrix=new ColorMatrix{Matrix33=Math.Clamp(1-age*1.28f,.08f,1)};
+                attributes.SetColorMatrix(matrix);
+                int x=(int)frame.Position.X-left-size/2,y=(int)frame.Position.Y-top-size/2;
+                g.DrawImage(frame.Image,new Rectangle(x,y,size,size),0,0,144,144,GraphicsUnit.Pixel,attributes);
+            }
+            int bodyX=(int)Sim.Position.X-left-size/2,bodyY=(int)Sim.Position.Y-top-size/2;
+            renderer.Draw(g,new Rectangle(bodyX,bodyY,size,size),Sim,Area,Settings.ShowMeters);
+        });
+    }
+    void ClearGhosts(){foreach(var frame in ghostFrames)frame.Image.Dispose();ghostFrames.Clear();}
     void UpdateDeathMenu(Point mouse)
     {
         float remainsRadius=Settings.Skin==PetSkin.Cockroach?Math.Max(36,Sim.DisplaySize*.35f):Sim.DisplaySize*.82f+58;
@@ -262,7 +329,7 @@ public sealed class PetApplication : ApplicationContext
     protected override void ExitThreadCore()
     {
         if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
-        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
+        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();ClearGhosts();abilitySound.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
 

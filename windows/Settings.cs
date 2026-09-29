@@ -7,7 +7,7 @@ public enum PetSkin { Fly, Cockroach }
 public sealed class Settings
 {
     public const int MinPetSize=60,MaxPetSize=800;
-    public int SchemaVersion { get; set; } = 8;
+    public int SchemaVersion { get; set; } = 12;
     public PetSkin Skin { get; set; } = PetSkin.Fly;
     public int FramesPerSecond { get; set; } = 90;
     public int PetSize { get; set; } = 90;
@@ -18,9 +18,11 @@ public sealed class Settings
     public float FearRadius { get; set; } = 250;
     public float EscapeSafeRadiusMultiplier { get; set; } = 1.35f;
     public float EscapeAccelerationGain { get; set; } = 1.4f;
-    public float SwatDamage { get; set; } = 40;
-    public float HungerPerMinute { get; set; } = .6f;
-    public float FlightFullnessCostPerSecond { get; set; } = .006f;
+    public float SwatDamage { get; set; } = 20;
+    public float EvanescenceChance { get; set; } = .30f;
+    public float RockSolidChance { get; set; } = .30f;
+    public float HungerPerMinute { get; set; } = .25f;
+    public float FlightFullnessCostPerSecond { get; set; } = .003f;
     public float AlarmSeconds { get; set; } = 1.4f;
     public float FeedPerSecond { get; set; } = 15;
     public float StarvationDamagePerSecond { get; set; } = .08f;
@@ -93,6 +95,22 @@ public sealed class Settings
                 if(Math.Abs(s.StarvationDamagePerSecond-.2f)<.0001f)s.StarvationDamagePerSecond=.08f;
                 s.SchemaVersion=8;changed=true;
             }
+            if(exists&&storedSchema<9)
+            {
+                // Preserve customized combat values while upgrading the old defaults.
+                if(Math.Abs(s.SwatDamage-40)<.0001f)s.SwatDamage=20;
+                if(Math.Abs(s.EvanescenceChance-.16f)<.0001f)s.EvanescenceChance=.30f;
+                if(Math.Abs(s.RockSolidChance-.16f)<.0001f)s.RockSolidChance=.30f;
+                s.SchemaVersion=9;changed=true;
+            }
+            if(exists&&storedSchema<10){s.SchemaVersion=10;changed=true;}
+            if(exists&&storedSchema<11)
+            {
+                if(Math.Abs(s.HungerPerMinute-.6f)<.0001f)s.HungerPerMinute=.25f;
+                if(Math.Abs(s.FlightFullnessCostPerSecond-.006f)<.0001f)s.FlightFullnessCostPerSecond=.003f;
+                s.SchemaVersion=11;changed=true;
+            }
+            if(exists&&storedSchema<12){s.SchemaVersion=12;changed=true;}
             if(changed)s.Save();
             s.Validate(); return s;
         }
@@ -107,9 +125,11 @@ public sealed class Settings
         if(!Enum.IsDefined(Skin))Skin=PetSkin.Fly;
         FlightSpeed = Safe(FlightSpeed, 30, 900,400); FearRadius = Safe(FearRadius,80,800,250);
         EscapeSafeRadiusMultiplier=Safe(EscapeSafeRadiusMultiplier,1,2.5f,1.35f);EscapeAccelerationGain=Safe(EscapeAccelerationGain,0,4,1.4f);
-        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.006f);
+        FlightFullnessCostPerSecond=Safe(FlightFullnessCostPerSecond,0,10,.003f);
         AlarmSeconds=Safe(AlarmSeconds,.1f,10,1.4f);
-        SwatDamage = Safe(SwatDamage,1,100,40); HungerPerMinute = Safe(HungerPerMinute,0,60,.6f);
+        SwatDamage = Safe(SwatDamage,1,100,20); HungerPerMinute = Safe(HungerPerMinute,0,60,.25f);
+        EvanescenceChance=Safe(EvanescenceChance,0,1,.30f);
+        RockSolidChance=Math.Clamp(float.IsFinite(RockSolidChance)?RockSolidChance:.30f,0,1-EvanescenceChance);
         FeedPerSecond = Safe(FeedPerSecond,1,100,15); StarvationDamagePerSecond = Safe(StarvationDamagePerSecond,0,20,.08f);
         AlbinoChance=Safe(AlbinoChance,0,1,.1f);GiantCockroachChance=Safe(GiantCockroachChance,0,1,.1f);AlbinoSpeedMultiplier=Safe(AlbinoSpeedMultiplier,1,3,1.55f);
         RespawnMinSeconds = Safe(RespawnMinSeconds,1,3600,45); RespawnMaxSeconds = Safe(RespawnMaxSeconds,RespawnMinSeconds,7200,90);

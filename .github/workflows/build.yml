@@ -1,7 +1,7 @@
 name: Build and self-test
 
 env:
-  RELEASE_VERSION: 1.1.4
+  RELEASE_VERSION: 1.1.11
 
 on:
   push:
@@ -109,5 +109,7 @@ jobs:
 
             ## 本版重点
 
-            修复 Windows 版清理遗体后，鼠标停在原菜单位置仍会反复弹出“复活/清理”选项的问题。
+            Windows 版加入瞬机与铜头铁臂防御招式、3D 翻滚残影、本体金光动画及独立多声部音效；修复连续触发音效时的原生缓冲崩溃，并优化窗口、碰撞范围、饱食度和大脑活动图。
+
+            macOS 同步使用 v1.1.11 的共享脑引擎与模拟逻辑，并提供 Apple Silicon、Intel 和 Universal 2 三种构建。
 

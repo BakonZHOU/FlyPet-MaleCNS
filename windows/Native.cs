@@ -20,6 +20,7 @@ internal static class Native
     [DllImport("user32.dll",SetLastError=true)] public static extern bool UpdateLayeredWindow(nint w,nint dest,ref POINT p,ref SIZE size,nint src,ref POINT sp,uint key,ref BLEND blend,uint flags);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(nint w,nint after,int x,int y,int cx,int cy,uint flags);
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
     [DllImport("user32.dll",SetLastError=true)] public static extern nint SetWindowsHookEx(int type,HookProc proc,nint module,uint thread);
     [DllImport("user32.dll")] public static extern bool UnhookWindowsHookEx(nint hook);
     [DllImport("user32.dll")] public static extern nint CallNextHookEx(nint hook,int code,nint w,nint l);
@@ -70,16 +71,38 @@ public sealed class MouseHook : IDisposable
     readonly Native.HookProc proc;
     readonly nint handle;
     readonly Func<Point,bool> onDown;
+    readonly Func<Point,Point?>? onMove;
     bool consumeRelease;
-    public MouseHook(Func<Point,bool> handler)
+    bool correctingMove;
+    Point? expectedCorrection;
+    public MouseHook(Func<Point,bool> handler,Func<Point,Point?>? moveHandler=null)
     {
-        onDown=handler;proc=Callback;handle=Native.SetWindowsHookEx(14,proc,Native.GetModuleHandle(null),0);
+        onDown=handler;onMove=moveHandler;proc=Callback;handle=Native.SetWindowsHookEx(14,proc,Native.GetModuleHandle(null),0);
         if(handle==0)throw new Win32Exception(Marshal.GetLastWin32Error(),"无法启用鼠标交互");
     }
     nint Callback(int code,nint w,nint l)
     {
         if(code>=0)
         {
+            if(w==0x200&&onMove!=null)
+            {
+                var d=Marshal.PtrToStructure<Native.MouseData>(l);
+                if(expectedCorrection is Point expected&&expected.X==d.Point.X&&expected.Y==d.Point.Y)
+                {expectedCorrection=null;return Native.CallNextHookEx(handle,code,w,l);}
+                expectedCorrection=null;
+                // SetCursorPos emits an injected move. Pass it through unchanged.
+                if(!correctingMove&&(d.Flags&1)==0&&onMove(new(d.Point.X,d.Point.Y)) is Point slowed)
+                {
+                    correctingMove=true;
+                    try
+                    {
+                        if(slowed.X!=d.Point.X||slowed.Y!=d.Point.Y)
+                        {expectedCorrection=slowed;Native.SetCursorPos(slowed.X,slowed.Y);}
+                    }
+                    finally{correctingMove=false;}
+                    return 1;
+                }
+            }
             if(w==0x201){var d=Marshal.PtrToStructure<Native.MouseData>(l);consumeRelease=onDown(new(d.Point.X,d.Point.Y));if(consumeRelease)return 1;}
             if(w==0x202&&consumeRelease){consumeRelease=false;return 1;}
         }

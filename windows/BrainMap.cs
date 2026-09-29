@@ -15,25 +15,21 @@ public sealed class BrainMapWindow : Form
     double lastSample;
     public BrainMapWindow(PetApplication app)
     {
-        this.app=app;Theme.Form(this);Text="FlyPet · 大脑神经元活动图";ClientSize=new(1190,820);MinimumSize=new(1190,820);StartPosition=FormStartPosition.CenterScreen;
-        Controls.Add(Theme.Label("MaleCNS 神经元活动",22,15,640,40,19,Theme.Accent));
-        Controls.Add(Theme.Label("点表示原始数据标注的胞体位置；亮度是本程序计算的近期放电率。XY/XZ 是解剖投影，不是手绘示意。",22,58,1100,28,9,Theme.Muted));
-        view=new ComboBox{Location=new(25,94),Size=new(180,28),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};
+        this.app=app;Theme.Form(this);Text="FlyPet · 大脑活动";ClientSize=new(620,430);MinimumSize=new(580,400);FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
+        Controls.Add(Theme.Label("MaleCNS 神经元活动",16,10,360,27,14,Theme.Accent));
+        view=new ComboBox{Location=new(16,42),Size=new(120,24),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};
         view.Items.AddRange(["背视 XY","侧视 XZ"]);view.SelectedIndex=0;Controls.Add(view);
-        synapses=new CheckBox{Text="突触传播",Checked=app.Settings.NeuralGain>0,Location=new(230,93),Size=new(110,29)};
+        synapses=new CheckBox{Text="突触",Checked=app.Settings.NeuralGain>0,Location=new(145,40),Size=new(68,28)};
         synapses.CheckedChanged+=(_,_)=>{app.Settings.NeuralGain=synapses.Checked?1:0;app.Settings.Save();};Controls.Add(synapses);
-        edge=new CheckBox{Text="边缘感觉输入",Checked=app.Settings.EdgeSensing,Location=new(350,93),Size=new(140,29)};
+        edge=new CheckBox{Text="边缘输入",Checked=app.Settings.EdgeSensing,Location=new(218,40),Size=new(90,28)};
         edge.CheckedChanged+=(_,_)=>{app.Settings.EdgeSensing=edge.Checked;app.Settings.Save();};Controls.Add(edge);
-        neural=new CheckBox{Text="神经转向读出",Checked=app.Settings.NeuralSteering,Location=new(500,93),Size=new(140,29)};
+        neural=new CheckBox{Text="神经转向",Checked=app.Settings.NeuralSteering,Location=new(313,40),Size=new(90,28)};
         neural.CheckedChanged+=(_,_)=>{app.Settings.NeuralSteering=neural.Checked;app.Settings.Save();};Controls.Add(neural);
-        Controls.Add(Theme.Label("滚轮缩放 · 拖动平移 · 点击节点查看 ID",650,94,480,28,9,Theme.Muted));
-        map=new SomaMap(app){Location=new(22,134),Size=new(837,409)};map.NodeSelected+=index=>{selected=index;UpdateDetails();};Controls.Add(map);
+        map=new SomaMap(app){Location=new(16,76),Size=new(392,225),Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Left};map.NodeSelected+=index=>{selected=index;UpdateDetails();};Controls.Add(map);
         view.SelectedIndexChanged+=(_,_)=>{map.View=view.SelectedIndex;map.Invalidate();};
-        details=Theme.Label("点击亮点或灰点查看单个神经元",877,141,282,310,9,Theme.Muted);Controls.Add(details);
-        summary=Theme.Label("",877,452,280,86,9,Theme.Accent);Controls.Add(summary);
-        Controls.Add(Theme.Label("最近 60 秒 · 各回路活动 / 有效输出热图（每格约 100 ms，对数亮度）",22,552,900,26,10));
-        timeline=new ActivityTimeline(app){Location=new(22,580),Size=new(1137,198)};Controls.Add(timeline);
-        Controls.Add(Theme.Label("按图选择神经元可追踪最强输入与输出连接；逃逸行显示威胁门控后的有效输出。亮起并不等于生物学功能得到验证。",22,787,1125,24,9,Theme.Muted));
+        details=Theme.Label("点击节点查看详情",420,76,180,185,8,Theme.Muted);details.Anchor=AnchorStyles.Top|AnchorStyles.Bottom|AnchorStyles.Right;Controls.Add(details);
+        summary=Theme.Label("",420,265,180,36,8,Theme.Accent);summary.Anchor=AnchorStyles.Bottom|AnchorStyles.Right;Controls.Add(summary);
+        timeline=new ActivityTimeline(app){Location=new(16,321),Size=new(584,82),Anchor=AnchorStyles.Bottom|AnchorStyles.Left|AnchorStyles.Right};Controls.Add(timeline);
         ResumeLayout(false);
     }
     public void RefreshActivity()
@@ -102,8 +98,6 @@ public sealed class SomaMap : Control
         foreach(var n in nodes)if(n.Soma?.Length==3){minX=Math.Min(minX,n.Soma[0]);maxX=Math.Max(maxX,n.Soma[0]);long y=n.Soma[View==0?1:2];minY=Math.Min(minY,y);maxY=Math.Max(maxY,y);}
         float sx=(Width-50f)/Math.Max(1,maxX-minX),sy=(Height-48f)/Math.Max(1,maxY-minY),scale=Math.Min(sx,sy);
         using var grid=new Pen(Color.FromArgb(34,43,42,38));for(int x=0;x<Width;x+=40)g.DrawLine(grid,x,0,x,Height);for(int y=0;y<Height;y+=40)g.DrawLine(grid,0,y,Width,y);
-        using var caption=new Font("Consolas",8);using var captionBrush=new SolidBrush(Theme.Muted);
-        g.DrawString(View==0?"SOMA XY / DORSAL":"SOMA XZ / LATERAL",caption,captionBrush,12,9);
         for(int i=0;i<nodes.Length;i++)
         {
             var loc=nodes[i].Soma;if(loc?.Length!=3){points[i]=new(-100,-100);continue;}
@@ -115,8 +109,6 @@ public sealed class SomaMap : Control
             using var brush=new SolidBrush(Color.FromArgb(alpha,c));g.FillEllipse(brush,x-size/2,y-size/2,size,size);
             if(i==Selected){using var ring=new Pen(Theme.Text,1.5f);g.DrawEllipse(ring,x-8,y-8,16,16);}
         }
-        using var legend=new Font("Consolas",8);using var legendBrush=new SolidBrush(Theme.Muted);
-        g.DrawString("视觉  嗅觉  记忆/奖励  导航  下行/运动  甜味  中间神经元",legend,legendBrush,13,Height-24);
     }
 }
 

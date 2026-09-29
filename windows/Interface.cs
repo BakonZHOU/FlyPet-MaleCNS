@@ -149,7 +149,7 @@ public sealed class SettingsWindow : Form
     public SettingsWindow(PetApplication app)
     {
         this.app=app;Theme.Form(this);Text="FlyPet · 外观与设置";
-        ClientSize=new(620,455);MinimumSize=new(520,390);StartPosition=FormStartPosition.CenterScreen;TopMost=true;
+        ClientSize=new(620,455);MinimumSize=new(520,390);FormBorderStyle=FormBorderStyle.Sizable;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;TopMost=false;
 
         var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(14,12,14,10),BackColor=Theme.Bg};
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -235,6 +235,8 @@ public sealed class SettingsWindow : Form
         Num("生存",nameof(s.RespawnMinSeconds),"复活最短等待 · 秒",1,3600,(decimal)s.RespawnMinSeconds);
         Num("生存",nameof(s.RespawnMaxSeconds),"复活最长等待 · 秒",1,7200,(decimal)s.RespawnMaxSeconds);
         Num("生存",nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
+        Num("生存",nameof(s.EvanescenceChance),"瞬机触发概率",0,1,(decimal)s.EvanescenceChance,2);
+        Num("生存",nameof(s.RockSolidChance),"铜头铁臂触发概率",0,1,(decimal)s.RockSolidChance,2);
         invincible=Check("生存","无敌模式",s.Invincible);
 
         Num("行为",nameof(s.FlightSpeed),"基础移动速度 · px/s",30,900,(decimal)s.FlightSpeed);
@@ -303,6 +305,8 @@ public sealed class SettingsWindow : Form
             var s=app.Settings;
             if(numbers[nameof(s.RespawnMaxSeconds)].Value<numbers[nameof(s.RespawnMinSeconds)].Value)
             {MessageBox.Show(this,"最长复活等待不能小于最短等待。","设置");return;}
+            if(numbers[nameof(s.EvanescenceChance)].Value+numbers[nameof(s.RockSolidChance)].Value>1)
+            {MessageBox.Show(this,"瞬机和铜头铁臂的触发概率之和不能超过 1。","设置");return;}
             foreach(var (name,n) in numbers)
             {
                 var p=typeof(Settings).GetProperty(name)!;

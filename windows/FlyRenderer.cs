@@ -22,16 +22,44 @@ public sealed class FlyRenderer : IDisposable
             var deadState=output.Save();output.InterpolationMode=InterpolationMode.NearestNeighbor;output.PixelOffsetMode=PixelOffsetMode.Half;
             output.DrawImage(low,target,0,0,144,144,GraphicsUnit.Pixel);output.Restore(deadState);return;
         }
-        bool roachFlying=roach&&sim.CockroachFlying;
+        bool solid=sim.Defense==DefenseMove.RockSolid;
+        bool enhancedSolid=solid;
+        bool dodging=sim.Defense==DefenseMove.Evanescence;
+        bool roachFlying=roach&&(sim.CockroachFlying||solid);
+        float defenseProgress=sim.DefenseProgress;
         bool onSurface=roach&&!roachFlying||sim.Grounded||sim.Dead;
-        float bob=sim.Dead||roach&&!roachFlying?0:MathF.Sin(sim.Time*6)*1.8f;
+        float bob=solid?0:dodging?MathF.Sin(defenseProgress*MathF.PI)*6:sim.Dead||roach&&!roachFlying?0:MathF.Sin(sim.Time*6)*1.8f;
         float shadowSpread=onSurface?1:1.12f;
         var shadowState=g.Save();g.TranslateTransform(76,71);g.RotateTransform(sim.Heading*180/MathF.PI);
         using(var shadow=new SolidBrush(Color.FromArgb(onSurface?28:18,7,6,4)))g.FillEllipse(shadow,-39*shadowSpread,-43*shadowSpread,78*shadowSpread,86*shadowSpread);
         using(var coreShadow=new SolidBrush(Color.FromArgb(onSurface?48:31,7,6,4)))g.FillEllipse(coreShadow,-15*shadowSpread,-36*shadowSpread,30*shadowSpread,72*shadowSpread);
         g.Restore(shadowState);
+        if(solid)
+        {
+            // Short impact shards make the trigger readable at small pet sizes.
+            // They radiate as separate strokes, never as an outline or halo.
+            float burst=MathF.Exp(-defenseProgress*13);int alpha=Math.Clamp((int)(burst*245),0,245);
+            if(alpha>8)
+            {
+                var smooth=g.SmoothingMode;g.SmoothingMode=SmoothingMode.AntiAlias;
+                using var glow=new Pen(Color.FromArgb(alpha/3,255,178,31),3.2f){StartCap=LineCap.Round,EndCap=LineCap.Round};
+                using var core=new Pen(Color.FromArgb(alpha,255,250,184),1.05f){StartCap=LineCap.Round,EndCap=LineCap.Round};
+                ReadOnlySpan<float> angles=[-.18f,.62f,1.34f,2.12f,2.92f,3.76f,4.48f,5.38f];
+                for(int i=0;i<angles.Length;i++)
+                {
+                    float a=angles[i],inner=roach?28:25,outer=inner+9+burst*(i%2==0?11:7);
+                    var p1=new PointF(72+MathF.Cos(a)*inner,64+MathF.Sin(a)*inner);
+                    var p2=new PointF(72+MathF.Cos(a)*outer,64+MathF.Sin(a)*outer);
+                    g.DrawLine(glow,p1,p2);g.DrawLine(core,p1,p2);
+                }
+                g.SmoothingMode=smooth;
+            }
+        }
         faces.Clear();projected.Clear();
-        float flap=(sim.Grounded||sim.Dead)?.06f:MathF.Sin(sim.Time*135)*.52f+.35f;
+        // Copper-head impact: a short, readable hit-stop followed by a deterministic
+        // wing shudder. It starts from the same pose regardless of the idle cycle.
+        float solidFlap=defenseProgress<.075f?.10f:MathF.Sin((defenseProgress-.075f)*MathF.Tau*7.5f)*.78f+.38f;
+        float flap=solid?solidFlap:(sim.Grounded||sim.Dead)?.06f:MathF.Sin(sim.Time*135)*.52f+.35f;
         if(roach)
         {
             // American cockroach: broad amber pronotum, dark central mark, tapered
@@ -46,7 +74,7 @@ public sealed class FlyRenderer : IDisposable
             for(int side=-1;side<=1;side+=2)
             {
                 Ellipsoid(new(side*.255f,-1.02f,.17f),new(.12f,.14f,.14f),Color.FromArgb(26,24,20),37+side);
-                float beat=MathF.Sin(sim.Time*66+side*.22f);
+                float beat=solid?(defenseProgress<.075f?0:MathF.Sin((defenseProgress-.075f)*MathF.Tau*7.5f+side*.22f)):MathF.Sin(sim.Time*66+side*.22f);
                 if(roachFlying)
                 {
                     // Transparent hindwings flutter under the raised leather forewings.
@@ -54,7 +82,7 @@ public sealed class FlyRenderer : IDisposable
                     faces.Add(new(root,outer,tail,Color.FromArgb(140,197,151,103),70+side));
                     faces.Add(new(root,tail,new(side*.27f,1.16f,.22f),Color.FromArgb(125,218,176,118),72+side));
                 }
-                Vector3 a=new(side*.08f,-.40f,.36f),b=new(side*(roachFlying?.75f:.40f),roachFlying?-.11f:.05f,roachFlying?.48f:.39f),c=new(side*(roachFlying?.86f:.19f),roachFlying?1.13f:1.48f,roachFlying?.35f:.28f);
+                Vector3 a=new(side*.08f,-.40f,.36f),b=new(side*((roachFlying?.75f:.40f)+(solid?beat*.07f:0)),roachFlying?-.11f:.05f,roachFlying?.48f+(solid?beat*.12f:0):.39f),c=new(side*((roachFlying?.86f:.19f)+(solid?beat*.09f:0)),roachFlying?1.13f:1.48f,roachFlying?.35f+(solid?beat*.10f:0):.28f);
                 faces.Add(new(a,b,c,Color.FromArgb(234,147,80,42),60+side));
                 faces.Add(new(a,c,new(side*.012f,1.49f,.22f),Color.FromArgb(240,121,61,34),62+side));
             }
@@ -80,17 +108,21 @@ public sealed class FlyRenderer : IDisposable
         }
         // Desktop position no longer tilts the camera. Keep a small fixed pitch so the
         // low-poly facets retain depth while the overall view remains top-down.
-        var rot=Matrix4x4.CreateRotationX(sim.Dead?MathF.PI:0)*Matrix4x4.CreateRotationZ(sim.Heading)*Matrix4x4.CreateRotationX(-.08f);
-        PointF Project(Vector3 v){v=Vector3.Transform(v,rot);float p=4.1f/(4.1f-v.Z);return new(72+v.X*28*p,64+v.Y*28*p-v.Z*11-bob);}
-        using(var legPen=new Pen(roach?Color.FromArgb(68,34,23):Color.FromArgb(47,42,28),roach?2.8f:2.1f){StartCap=LineCap.Round,EndCap=LineCap.Round,LineJoin=LineJoin.Round})
-        using(var lightPen=new Pen(Color.FromArgb(116,102,62),.8f))
+        float roll=dodging?MathF.Tau*(defenseProgress*defenseProgress*(3-2*defenseProgress)):0;
+        float impactScale=enhancedSolid?1+.125f*MathF.Exp(-defenseProgress*11)*MathF.Cos(defenseProgress*25):1;
+        float impactX=enhancedSolid?MathF.Sin(defenseProgress*118)*MathF.Exp(-defenseProgress*18)*1.8f:0;
+        float impactY=enhancedSolid?MathF.Cos(defenseProgress*91)*MathF.Exp(-defenseProgress*20)*1.15f:0;
+        var rot=Matrix4x4.CreateScale(impactScale)*Matrix4x4.CreateRotationY(roll)*Matrix4x4.CreateRotationX(dodging?MathF.Sin(roll)*.38f:sim.Dead?MathF.PI:0)*Matrix4x4.CreateRotationZ(sim.Heading)*Matrix4x4.CreateRotationX(-.08f);
+        PointF Project(Vector3 v){v=Vector3.Transform(v,rot);float p=4.1f/(4.1f-v.Z);return new(72+impactX+v.X*28*p,64+impactY+v.Y*28*p-v.Z*11-bob);}
+        using(var legPen=new Pen(solid?Color.FromArgb(255,218,74):roach?Color.FromArgb(68,34,23):Color.FromArgb(47,42,28),roach?2.8f:2.1f){StartCap=LineCap.Round,EndCap=LineCap.Round,LineJoin=LineJoin.Round})
+        using(var lightPen=new Pen(solid?Color.FromArgb(255,250,184):Color.FromArgb(116,102,62),.8f))
         {
             for(int side=-1;side<=1;side+=2)for(int j=0;j<3;j++)
             {
                 float y=-.42f+j*.45f;float gait=roach?(sim.Dead||sim.Grounded?0:MathF.Sin(sim.Time*(roachFlying?18:22)+j*2.1f+side)*(roachFlying?.07f:.23f)):sim.Dead?0:MathF.Sin(sim.Time*13+j*2.1f+side)*.13f;
                 var a=Project(new(side*.31f,y,.00f));var b=Project(new(side*(.78f+gait),y+(j-1)*.27f,-.25f));var c=Project(new(side*(1.15f+gait),y+(j-1)*.57f,-.48f));
                 g.DrawLines(legPen,[a,b,c]);g.DrawLine(lightPen,a,b);
-                using var joint=new SolidBrush(Color.FromArgb(82,73,43));g.FillEllipse(joint,b.X-2,b.Y-2,4,4);
+                using var joint=new SolidBrush(solid?Color.FromArgb(255,239,133):Color.FromArgb(82,73,43));g.FillEllipse(joint,b.X-2,b.Y-2,4,4);
                 if(roach&&j==0)using(var bristle=new Pen(Color.FromArgb(128,160,107,64),.65f))
                 for(int k=1;k<=3;k++)
                 {
@@ -110,16 +142,21 @@ public sealed class FlyRenderer : IDisposable
             if(f.Color.A==255&&normal.Z<-.15f)continue;
             int grain=((f.Grain*71+17)%23)-11;
             int Ch(int v)=>Math.Clamp((int)(v*light)+grain,0,255);
-            var col=sim.HitFlash>0?Color.FromArgb(f.Color.A,190,55,39):Color.FromArgb(f.Color.A,Ch(f.Color.R),Ch(f.Color.G),Ch(f.Color.B));
+            float flash=solid?Math.Clamp(1.28f*MathF.Exp(-defenseProgress*9)+.88f*MathF.Exp(-MathF.Pow((defenseProgress-.20f)/.060f,2))+.30f*MathF.Exp(-MathF.Pow((defenseProgress-.39f)/.075f,2)),0,1):0;
+            float sweep=solid?MathF.Exp(-MathF.Pow(((a.X+b.X+c.X)/3-(-1.7f+3.4f*defenseProgress))/.28f,2)):0;
+            int solidLight=Math.Clamp((int)(170+diffuse*78+rim*45+grain*.35f+flash*(enhancedSolid?72:45)+sweep*(enhancedSolid?52:37)),155,255);
+            int solidGreen=Math.Clamp(solidLight-25+(int)(flash*(enhancedSolid?37:25)),0,255);
+            int solidBlue=Math.Clamp(solidLight-112+(int)(flash*(enhancedSolid?138:105)),35,248);
+            var col=solid?Color.FromArgb(Math.Max(220,(int)f.Color.A),solidLight,solidGreen,solidBlue):sim.HitFlash>0?Color.FromArgb(f.Color.A,190,55,39):Color.FromArgb(f.Color.A,Ch(f.Color.R),Ch(f.Color.G),Ch(f.Color.B));
             projected.Add(new([Project(f.A),Project(f.B),Project(f.C)],(a.Z+b.Z+c.Z)/3,col));
         }
         projected.Sort((a,b)=>a.Depth.CompareTo(b.Depth));
         foreach(var p in projected)
         {
             using var brush=new SolidBrush(p.Color);g.FillPolygon(brush,p.Points);
-            using var edge=new Pen(Color.FromArgb(p.Color.A<255?38:58,12,14,11),.55f);g.DrawPolygon(edge,p.Points);
+            using var edge=new Pen(solid?Color.FromArgb(150,255,239,139):Color.FromArgb(p.Color.A<255?38:58,12,14,11),.55f);g.DrawPolygon(edge,p.Points);
         }
-        if(!roach)using(var veins=new Pen(Color.FromArgb(135,51,67,57),.8f))
+        if(!roach)using(var veins=new Pen(solid?Color.FromArgb(235,255,235,112):Color.FromArgb(135,51,67,57),.8f))
         for(int side=-1;side<=1;side+=2)
         {
             var a=Project(new(side*.19f,-.31f,.27f));var b=Project(new(side*1.72f,-.02f,flap+.02f));var c=Project(new(side*1.44f,.71f,flap*.82f+.02f));
@@ -133,7 +170,27 @@ public sealed class FlyRenderer : IDisposable
             g.DrawLine(veins,a,b);g.DrawLine(veins,a,c);
             g.DrawLine(veins,Project(new(side*.42f,.12f,.39f)),c);
         }
-        using(var hair=new Pen(roach?Color.FromArgb(63,36,24):Color.FromArgb(47,40,28),roach?1.35f:1))
+        if(enhancedSolid)
+        {
+            // Glints are anchored to the 3D body, so the model itself emits the flash.
+            // There is deliberately no outline, halo, or surrounding ring.
+            float first=MathF.Exp(-MathF.Pow((defenseProgress-.055f)/.045f,2));
+            float second=MathF.Exp(-MathF.Pow((defenseProgress-.205f)/.052f,2));
+            float last=MathF.Exp(-MathF.Pow((defenseProgress-.40f)/.075f,2));
+            void Glint(Vector3 anchor,float strength,float radius)
+            {
+                if(strength<.025f)return;var p=Project(anchor);int alpha=Math.Clamp((int)(strength*255),0,255);
+                using var wide=new Pen(Color.FromArgb(alpha/3,255,190,58),2.7f){StartCap=LineCap.Round,EndCap=LineCap.Round};
+                using var core=new Pen(Color.FromArgb(alpha,255,255,224),.8f){StartCap=LineCap.Round,EndCap=LineCap.Round};
+                float longRay=radius*(.75f+strength*.25f),shortRay=longRay*.48f;
+                g.DrawLine(wide,p.X-longRay,p.Y,p.X+longRay,p.Y);g.DrawLine(wide,p.X,p.Y-shortRay,p.X,p.Y+shortRay);
+                g.DrawLine(core,p.X-longRay,p.Y,p.X+longRay,p.Y);g.DrawLine(core,p.X,p.Y-shortRay,p.X,p.Y+shortRay);
+            }
+            var smooth=g.SmoothingMode;g.SmoothingMode=SmoothingMode.AntiAlias;
+            Glint(new(-.22f,-.42f,.53f),first,11);Glint(new(.25f,.17f,.50f),second,8);Glint(new(-.12f,.72f,.34f),last,5.5f);
+            g.SmoothingMode=smooth;
+        }
+        using(var hair=new Pen(solid?Color.FromArgb(255,229,91):roach?Color.FromArgb(63,36,24):Color.FromArgb(47,40,28),roach?1.35f:1))
         {
             for(int s=-1;s<=1;s+=2)
             {
@@ -142,7 +199,7 @@ public sealed class FlyRenderer : IDisposable
                     var root=Project(new(s*.17f,-1.13f,.18f));var mid=Project(new(s*.58f,-1.51f,.12f));var tip=Project(new(s*(.85f+MathF.Sin(sim.Time*8+s)*.09f),-1.82f,-.03f));
                     g.DrawLines(hair,[root,mid,tip]);
                 }
-                else {var root=Project(new(s*.15f,-.91f,.20f));var tip=Project(new(s*.29f,-1.27f,.28f));g.DrawLine(hair,root,tip);g.FillEllipse(Brushes.SaddleBrown,tip.X-1.5f,tip.Y-1.5f,3,3);}
+                else {var root=Project(new(s*.15f,-.91f,.20f));var tip=Project(new(s*.29f,-1.27f,.28f));g.DrawLine(hair,root,tip);using var tipBrush=new SolidBrush(solid?Color.FromArgb(255,242,151):Color.SaddleBrown);g.FillEllipse(tipBrush,tip.X-1.5f,tip.Y-1.5f,3,3);}
             }
             if(sim.Behavior is "进食中" or "吃掉糖粒并记住")g.DrawLine(hair,Project(new(0,-.94f,.03f)),Project(new(0,-1.33f,-.29f)));
         }
@@ -154,6 +211,37 @@ public sealed class FlyRenderer : IDisposable
         }
         var state=output.Save();output.InterpolationMode=InterpolationMode.NearestNeighbor;output.PixelOffsetMode=PixelOffsetMode.Half;
         output.DrawImage(low,target,0,0,144,144,GraphicsUnit.Pixel);output.Restore(state);
+    }
+    public unsafe Bitmap CaptureAfterimage(Simulation sim,Rectangle desktop)
+    {
+        using var source=new Bitmap(144,144,PixelFormat.Format32bppPArgb);
+        using(var g=Graphics.FromImage(source))Draw(g,new(0,0,144,144),sim,desktop,false);
+        var ghost=new Bitmap(144,144,PixelFormat.Format32bppPArgb);
+        var bounds=new Rectangle(0,0,144,144);
+        var input=source.LockBits(bounds,ImageLockMode.ReadOnly,PixelFormat.Format32bppPArgb);
+        var output=ghost.LockBits(bounds,ImageLockMode.WriteOnly,PixelFormat.Format32bppPArgb);
+        try
+        {
+            for(int y=0;y<144;y++)
+            {
+                byte* src=(byte*)input.Scan0+y*input.Stride;
+                byte* dst=(byte*)output.Scan0+y*output.Stride;
+                for(int x=0;x<144;x++)
+                {
+                    int alpha=src[x*4+3];
+                    // The faint ground shadow stays transparent; all body parts
+                    // become a bright, partially transparent white 3D snapshot.
+                    if(alpha<=70)continue;
+                    int a=Math.Clamp((int)(alpha*.78f),72,199);
+                    dst[x*4]=(byte)a;
+                    dst[x*4+1]=(byte)(a*251/255);
+                    dst[x*4+2]=(byte)(a*245/255);
+                    dst[x*4+3]=(byte)a;
+                }
+            }
+        }
+        finally{source.UnlockBits(input);ghost.UnlockBits(output);}
+        return ghost;
     }
     void Ellipsoid(Vector3 center,Vector3 radius,Color color,int seed)
     {

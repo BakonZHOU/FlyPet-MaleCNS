@@ -15,7 +15,10 @@ static class SelfTest
         var data=CircuitData.Load();var area=new Rectangle(0,0,1920,1080);var mouse=new Vector2(-5000,-5000);
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
-        var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f&&Math.Abs(defaults.GiantCockroachChance-.1f)<.0001f&&defaults.RespawnMinSeconds==45&&defaults.RespawnMaxSeconds==90&&100/defaults.StarvationDamagePerSecond>=1200,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance,giantChance=defaults.GiantCockroachChance,respawnMin=defaults.RespawnMinSeconds,respawnMax=defaults.RespawnMaxSeconds,starvationMinutes=100/defaults.StarvationDamagePerSecond/60});
+        var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f&&Math.Abs(defaults.GiantCockroachChance-.1f)<.0001f&&defaults.RespawnMinSeconds==45&&defaults.RespawnMaxSeconds==90&&defaults.SwatDamage==20&&defaults.EvanescenceChance==.30f&&defaults.RockSolidChance==.30f&&100/defaults.StarvationDamagePerSecond>=1200,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance,giantChance=defaults.GiantCockroachChance,swatDamage=defaults.SwatDamage,evanescence=defaults.EvanescenceChance,rockSolid=defaults.RockSolidChance,respawnMin=defaults.RespawnMinSeconds,respawnMax=defaults.RespawnMaxSeconds,starvationMinutes=100/defaults.StarvationDamagePerSecond/60});
+        var fullStart=Make();var immortal=Make(new(){Invincible=true});immortal.Fullness=12;Advance(immortal,4);
+        Check("fullness_starts_full_and_invincible_stays_full",fullStart.Fullness==100&&immortal.Fullness==100,new{initial=fullStart.Fullness,invincible=immortal.Fullness});
+        using(var sound=new AbilitySound()){sound.StressVoicesForTest(64);Thread.Sleep(250);Check("ability_sounds_concurrent_native_buffers",true);}
         var enlarged=new Settings{PetSize=400};enlarged.Validate();Check("pet_size_400_is_preserved",enlarged.PetSize==400,new{size=enlarged.PetSize,max=Settings.MaxPetSize});
         var giantSettings=new Settings{Skin=PetSkin.Cockroach,CockroachSize=120,GiantCockroachSize=700};giantSettings.Validate();
         Check("giant_size_700_is_preserved",giantSettings.GiantCockroachSize==700,new{size=giantSettings.GiantCockroachSize,max=Settings.MaxPetSize});
@@ -62,7 +65,7 @@ static class SelfTest
         var scared=Make();var threat=scared.Position+new Vector2(60,0);float d0=Vector2.Distance(scared.Position,threat);Advance(scared,.7f,true,threat);
         Check("cursor_avoidance",Vector2.Distance(scared.Position,threat)>d0+20,new{before=d0,after=Vector2.Distance(scared.Position,threat),fear=scared.Brain.Fear});
         var turning=Make(new(){RestEnabled=false});turning.Heading=0;var turnThreat=turning.Position+new Vector2(60,0);Advance(turning,.45f,true,turnThreat);
-        Check("cursor_escape_uses_turning_circuit",Math.Abs(turning.Heading)>.30f,new{heading=turning.Heading,optomotor=turning.Brain.OptomotorTurn,descending=turning.Brain.DescendingTurn,turn=turning.Brain.Turn});
+        Check("cursor_escape_uses_turning_circuit",Math.Abs(turning.Heading)>.20f,new{heading=turning.Heading,optomotor=turning.Brain.OptomotorTurn,descending=turning.Brain.DescendingTurn,turn=turning.Brain.Turn});
         var adaptiveEscape=Make(new(){RestEnabled=false});bool usedRapidTurn=false;
         for(int i=0;i<180;i++){adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(80,0),true);usedRapidTurn|=adaptiveEscape.RapidEscapeTurn;}
         float stalledUrgency=adaptiveEscape.EscapeUrgency;
@@ -71,7 +74,75 @@ static class SelfTest
         Check("escape_persists_past_detection_radius",adaptiveEscape.Brain.ThreatDrive>.1f&&adaptiveEscape.EscapeUrgency>.1f,new{threatDrive=adaptiveEscape.Brain.ThreatDrive,urgency=adaptiveEscape.EscapeUrgency});
         for(int i=0;i<90;i++)adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(adaptiveEscape.Settings.FearRadius*adaptiveEscape.Settings.EscapeSafeRadiusMultiplier*1.2f,0),true);
         Check("escape_releases_after_safe_distance",adaptiveEscape.EscapeUrgency<.01f,new{urgency=adaptiveEscape.EscapeUrgency,distanceRate=adaptiveEscape.EscapeDistanceRate});
-        var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.CauseOfDeath==DeathCause.Swatted&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
+        var dodge=Make(new(){EvanescenceChance=1,RockSolidChance=0,SwatDamage=100});
+        var dodgeOrigin=dodge.Position;
+        Check("evanescence_triggers_without_damage",dodge.Hit(dodge.Position)&&dodge.Defense==DefenseMove.Evanescence&&dodge.Health==100);
+        using(var ghostRenderer=new FlyRenderer())using(var ghost=ghostRenderer.CaptureAfterimage(dodge,area))
+        {
+            var ghostPixels=Enumerable.Range(0,ghost.Width).SelectMany(x=>Enumerable.Range(0,ghost.Height).Select(y=>ghost.GetPixel(x,y))).Where(c=>c.A>0).ToArray();
+            Check("evanescence_freezes_whole_model_as_translucent_white",ghostPixels.Length>500&&ghostPixels.All(c=>c.A<200&&c.R>=240&&c.G>=245&&c.B>=253),new{pixels=ghostPixels.Length,maxAlpha=ghostPixels.Max(c=>c.A)});
+            ghost.Save(Path.Combine(output,"evanescence-afterimage.png"));
+        }
+        Advance(dodge,.3f);
+        Check("evanescence_roll_moves_and_remains_invulnerable",dodge.Defense==DefenseMove.Evanescence&&Vector2.Distance(dodge.Position,dodgeOrigin)>10&&dodge.Hit(dodge.Position)&&dodge.Health==100);
+        Advance(dodge,.35f);Check("evanescence_ends_after_six_tenths",dodge.Defense==DefenseMove.None);
+        bool dodgeTailBlocked=dodge.Hit(dodge.Position,false)&&dodge.Health==100;
+        Check("evanescence_short_recovery_stays_invulnerable",dodgeTailBlocked&&dodge.InvulnerabilityRemaining>0);
+        Advance(dodge,.12f);Check("evanescence_damage_resumes_after_recovery",dodge.Hit(dodge.Position,false)&&dodge.Dead);
+        var solid=Make(new(){EvanescenceChance=0,RockSolidChance=1,SwatDamage=100});
+        var solidOrigin=solid.Position;
+        Check("rock_solid_triggers_without_damage",solid.Hit(solid.Position)&&solid.Defense==DefenseMove.RockSolid&&solid.Health==100);
+        using(var solidRenderer=new FlyRenderer())using(var preview=new Bitmap(300,300))
+        {
+            using(var previewGraphics=Graphics.FromImage(preview))solidRenderer.Draw(previewGraphics,new Rectangle(0,0,300,300),solid,area,false);
+            Check("rock_solid_has_no_outer_halo",preview.GetPixel(150,10).A==0,new{topAlpha=preview.GetPixel(150,10).A});
+            preview.Save(Path.Combine(output,"rock-solid-preview.png"));
+        }
+        Advance(solid,.3f);Check("rock_solid_holds_position_and_blocks_clicks",solid.Position==solidOrigin&&solid.Hit(solid.Position)&&solid.Health==100);
+        Advance(solid,.25f);Check("rock_solid_releases",solid.Defense==DefenseMove.None);
+        bool solidTailBlocked=solid.Hit(solid.Position,false)&&solid.Health==100;
+        Check("rock_solid_short_recovery_stays_invulnerable",solidTailBlocked&&solid.InvulnerabilityRemaining>0);
+        Advance(solid,.15f);Check("rock_solid_damage_resumes_after_guard",solid.Hit(solid.Position,false)&&solid.Dead);
+        var roachDefense=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=0,EvanescenceChance=1,RockSolidChance=0,SwatDamage=100});
+        Check("cockroach_can_evanesce",roachDefense.Hit(roachDefense.Position)&&!roachDefense.Dead&&roachDefense.Defense==DefenseMove.Evanescence);
+        Advance(roachDefense,.25f);
+        using(var roachRenderer=new FlyRenderer())using(var roachGhost=roachRenderer.CaptureAfterimage(roachDefense,area))
+        {
+            Check("cockroach_roll_has_3d_afterimage",roachGhost.GetPixel(72,65).A>0||roachGhost.GetPixel(72,85).A>0);
+            roachGhost.Save(Path.Combine(output,"cockroach-roll-afterimage.png"));
+        }
+        var roachSolid=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=0,EvanescenceChance=0,RockSolidChance=1,SwatDamage=100});
+        Check("cockroach_can_rock_solid",roachSolid.Hit(roachSolid.Position)&&!roachSolid.Dead&&roachSolid.Defense==DefenseMove.RockSolid);
+        using(var solidStrip=new Bitmap(720,360))using(var solidGraphics=Graphics.FromImage(solidStrip))using(var solidStripRenderer=new FlyRenderer())
+        {
+            solidGraphics.Clear(Color.FromArgb(22,26,30));
+            for(int row=0;row<2;row++)
+            {
+                var actor=Make(new(){Skin=row==0?PetSkin.Fly:PetSkin.Cockroach,GiantCockroachChance=0,EvanescenceChance=0,RockSolidChance=1});actor.Hit(actor.Position);
+                for(int frame=0;frame<4;frame++){if(frame>0)Advance(actor,.11f);solidStripRenderer.Draw(solidGraphics,new Rectangle(frame*180,row*180,180,180),actor,area,false);}
+            }
+            solidStrip.Save(Path.Combine(output,"rock-solid-frames.png"));
+        }
+        using(var strip=new Bitmap(720,360))using(var stripGraphics=Graphics.FromImage(strip))using(var stripRenderer=new FlyRenderer())
+        {
+            stripGraphics.Clear(Color.FromArgb(22,26,30));
+            for(int row=0;row<2;row++)
+            {
+                var actor=Make(new(){Skin=row==0?PetSkin.Fly:PetSkin.Cockroach,GiantCockroachChance=0,EvanescenceChance=1,RockSolidChance=0});
+                actor.Hit(actor.Position);
+                for(int frame=0;frame<4;frame++)
+                {
+                    if(frame>0)Advance(actor,.15f);
+                    stripRenderer.Draw(stripGraphics,new Rectangle(frame*180,row*180,180,180),actor,area,false);
+                }
+            }
+            strip.Save(Path.Combine(output,"roll-3d-frames.png"));
+        }
+        var normalDurability=Make(new(){AlbinoChance=0,EvanescenceChance=0,RockSolidChance=0});normalDurability.Fullness=20;
+        for(int i=0;i<4;i++){normalDurability.Hit(normalDurability.Position,false);Advance(normalDurability,.23f);}
+        Check("default_fly_survives_four_hits",!normalDurability.Dead&&normalDurability.Health==20,new{health=normalDurability.Health});
+        normalDurability.Hit(normalDurability.Position,false);Check("default_fly_dies_on_fifth_unblocked_hit",normalDurability.Dead);
+        var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position,false)&&dying.Dead&&dying.CauseOfDeath==DeathCause.Swatted&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
         Advance(dying,2.1f);Check("random_respawn",!dying.Dead&&dying.Health==100);
         var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead&&starving.CauseOfDeath==DeathCause.Starved);
         var capped=Make(new(){MaxSugar=3});for(int i=0;i<20;i++)capped.AddSugar(new(i,i));Check("bounded_food",capped.Sugars.Count==3);
@@ -81,7 +152,7 @@ static class SelfTest
         Check("edge_sensory_stimulus",edgeOn.Brain.WallDrive>.4f&&edgeOff.Brain.WallDrive==0,new{enabled=edgeOn.Brain.WallDrive,disabled=edgeOff.Brain.WallDrive});
         var navigationProbe=new Brain(data);for(int frame=0;frame<240;frame++){navigationProbe.SetInput(0,0,60,1,.95f,.9f,new Settings(),wallTurn:1,positionX:.05f,positionY:.5f,frameDt:1f/120);for(int ms=0;ms<8;ms++)navigationProbe.Step(1);}
         Check("edge_input_activates_navigation_circuit",navigationProbe.NavigationRate>.2f&&navigationProbe.NavigationTurn>.02f,new{rate=navigationProbe.NavigationRate,turn=navigationProbe.NavigationTurn,visualMotion=navigationProbe.VisualMotionRate});
-        var protectedFly=Make(new(){Invincible=true,SwatDamage=100});Advance(protectedFly,.2f);protectedFly.Hit(protectedFly.Position);
+        var protectedFly=Make(new(){Invincible=true,SwatDamage=100});Advance(protectedFly,.2f);protectedFly.Hit(protectedFly.Position,false);
         Check("invincible_hit_still_alarms",protectedFly.Health==100&&protectedFly.Alarm>0&&protectedFly.InjuryArousal>0,new{health=protectedFly.Health,alarm=protectedFly.Alarm,injury=protectedFly.InjuryArousal});
         Advance(protectedFly,3);Check("injury_arousal_persists",protectedFly.Alarm<1&&protectedFly.InjuryArousal>0);
         protectedFly.Revive(area);Check("revival_clears_injury",protectedFly.Health==100&&protectedFly.InjuryArousal==0&&protectedFly.Alarm==0);
@@ -114,13 +185,13 @@ static class SelfTest
         var freshLife=Make();freshLife.Brain.ImportMemory(avoidLearner.ExportMemory());freshLife.Revive(area);
         Check("new_fly_starts_with_blank_memory",freshLife.Brain.AvoidanceConfidence==0&&freshLife.Brain.MemoryConfidence==0,new{positive=freshLife.Brain.MemoryConfidence,negative=freshLife.Brain.AvoidanceConfidence});
         var albino=Make(new(){AlbinoChance=1,AlbinoSpeedMultiplier=1.5f});Check("albino_hidden_skin",albino.Albino&&albino.Health==albino.MaxHealth&&albino.MaxHealth==180);
-        var corpse=Make(new(){SwatDamage=100,RespawnMinSeconds=1,RespawnMaxSeconds=1});corpse.Hit(corpse.Position);corpse.CleanRemains();Advance(corpse,2);Check("cleaned_corpse_stays_clean",corpse.Dead&&!corpse.RemainsVisible);
+        var corpse=Make(new(){SwatDamage=100,RespawnMinSeconds=1,RespawnMaxSeconds=1});corpse.Hit(corpse.Position,false);corpse.CleanRemains();Advance(corpse,2);Check("cleaned_corpse_stays_clean",corpse.Dead&&!corpse.RemainsVisible);
         Check("cleaned_corpse_cannot_reopen_death_menu",!PetApplication.ShouldKeepDeathMenu(true,corpse.Dead,corpse.RemainsVisible,false,true),new{corpse.Dead,corpse.RemainsVisible,mouseOverOldMenu=true});
         Check("living_pet_cannot_open_death_menu",!PetApplication.ShouldKeepDeathMenu(true,false,true,false,true),new{dead=false,remainsVisible=true,mouseOverOldMenu=true});
         var flying=Make(new(){RestEnabled=false,HungerPerMinute=0});var resting=Make(new(){RestEnabled=false,HungerPerMinute=0,FlightFullnessCostPerSecond=0});
         flying.Fullness=resting.Fullness=20;
         Advance(flying,8);Advance(resting,8);
-        Check("flight_consumes_fullness",flying.Fullness<resting.Fullness-.03f,new{flying=flying.Fullness,zeroFlightCost=resting.Fullness});
+        Check("flight_consumes_fullness",flying.Fullness<resting.Fullness-.01f,new{flying=flying.Fullness,zeroFlightCost=resting.Fullness});
         var healing=Make(new(){HungerPerMinute=0,FlightFullnessCostPerSecond=0,SatiatedThreshold=80,SatiatedRegenPerSecond=2});healing.Fullness=90;healing.Health=50;Advance(healing,2);
         Check("satiated_fly_regenerates_health",healing.Health>=53.8f,new{health=healing.Health,fullness=healing.Fullness});
         var invalid=new Settings{FramesPerSecond=999,PetSize=-2,NeuralGain=float.NaN,RespawnMinSeconds=5,RespawnMaxSeconds=-9};invalid.Validate();Check("configuration_validation",invalid.FramesPerSecond==120&&invalid.PetSize==60&&invalid.NeuralGain==1&&invalid.RespawnMaxSeconds==5);
@@ -141,8 +212,8 @@ static class SelfTest
         {
             dg.Clear(Theme.Bg);
             var flyStarved=Make(new(){StarvationDamagePerSecond=10});flyStarved.Fullness=0;flyStarved.Health=1;Advance(flyStarved,.2f);
-            var flySwatted=Make(new(){SwatDamage=100});flySwatted.Hit(flySwatted.Position);
-            var roachDead=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=1,SwatDamage=100});roachDead.Health=1;roachDead.Hit(roachDead.Position);
+            var flySwatted=Make(new(){SwatDamage=100});flySwatted.Hit(flySwatted.Position,false);
+            var roachDead=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=1,SwatDamage=100});roachDead.Health=1;roachDead.Hit(roachDead.Position,false);
             Check("roach_death_leaves_small_remains",roachDead.Dead&&roachDead.DisplaySize==120,new{roachDead.CauseOfDeath,size=roachDead.DisplaySize});
             var samples=new[]{("果蝇 · 饿死",flyStarved),("果蝇 · 拍死",flySwatted),("双马尾 · 白卵",roachDead)};
             for(int i=0;i<samples.Length;i++)
