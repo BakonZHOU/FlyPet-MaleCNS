@@ -6,7 +6,8 @@ cp "$ROOT/macos/Info.plist" "$CONTENTS/Info.plist"; cp "$ROOT/README.md" "$CONTE
 swift "$ROOT/macos/make_icon.swift" "$BUILD/FlyPet.iconset"; iconutil -c icns "$BUILD/FlyPet.iconset" -o "$CONTENTS/Resources/FlyPet.icns"
 bins=(); for arch in $ARCHS; do
   swiftc -O -whole-module-optimization -target "${arch}-apple-macos13.0" -framework AppKit "$ROOT/macos/Sources/FlyPet/main.swift" -o "$BUILD/bin/FlyPet-$arch"
-  dotnet publish "$ROOT/macos/Engine/FlyPet.Engine.csproj" -c Release -r "osx-$arch" --self-contained true -p:PublishSingleFile=true -o "$CONTENTS/Resources/engine-$arch" --nologo
+  runtime_arch="$arch"; [ "$arch" = "x86_64" ] && runtime_arch="x64"
+  dotnet publish "$ROOT/macos/Engine/FlyPet.Engine.csproj" -c Release -r "osx-$runtime_arch" --self-contained true -p:PublishSingleFile=true -o "$CONTENTS/Resources/engine-$arch" --nologo
   bins+=("$BUILD/bin/FlyPet-$arch")
 done
 if [ "${#bins[@]}" -eq 1 ]; then cp "${bins[0]}" "$CONTENTS/MacOS/FlyPet"; else lipo -create "${bins[@]}" -output "$CONTENTS/MacOS/FlyPet"; fi
