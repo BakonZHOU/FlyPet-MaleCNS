@@ -251,8 +251,10 @@ public sealed class PetApplication : ApplicationContext
         bool overCorpse=visible&&Sim.Dead&&Sim.RemainsVisible&&Area.Contains(mouse)&&Vector2.Distance(new(mouse.X,mouse.Y),Sim.Position)<remainsRadius;
         if(deathMenu==null&&overCorpse){deathMenu=new DeathMenuWindow(()=>{Sim.Revive(Area);StartPet();},()=>{Sim.CleanRemains();});deathMenu.SetSkin(Settings.Skin);}
         if(deathMenu==null)return;
-        if(overCorpse||deathMenu.Bounds.Contains(mouse))deathMenu.ShowAt(Area,new((int)Sim.Position.X,(int)Sim.Position.Y));else deathMenu.Hide();
+        bool overMenu=deathMenu.Bounds.Contains(mouse);
+        if(ShouldKeepDeathMenu(visible,Sim.Dead,Sim.RemainsVisible,overCorpse,overMenu))deathMenu.ShowAt(Area,new((int)Sim.Position.X,(int)Sim.Position.Y));else deathMenu.Hide();
     }
+    internal static bool ShouldKeepDeathMenu(bool petVisible,bool dead,bool remainsVisible,bool overCorpse,bool overMenu)=>petVisible&&dead&&remainsVisible&&(overCorpse||overMenu);
     void SaveStatus()
     {
         try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),skin=Settings.Skin.ToString(),size=Sim.DisplaySize,rare=Sim.Albino,behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,deathCause=Sim.CauseOfDeath.ToString(),cockroachFlying=Sim.CockroachFlying,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,escapeUrgency=Sim.EscapeUrgency,escapeDistanceRate=Sim.EscapeDistanceRate,rapidEscapeTurn=Sim.RapidEscapeTurn,feeding=Sim.Brain.Feeding,olfactory=Sim.Brain.OlfactoryRate,memory=Sim.Brain.MemoryConfidence,avoidanceMemory=Sim.Brain.AvoidanceConfidence,avoidanceSkill=Sim.Brain.AvoidanceSkill,predictiveEdgeRisk=Sim.PredictiveEdgeRisk,learnedEdgeRisk=Sim.LearnedEdgeRisk,successfulEdgeAvoidances=Sim.SuccessfulEdgeAvoidances,reward=Sim.Brain.RewardSignal,edgeCollisions=Sim.EdgeCollisions},Settings.JsonOptions));}catch(IOException){}

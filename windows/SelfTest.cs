@@ -115,6 +115,8 @@ static class SelfTest
         Check("new_fly_starts_with_blank_memory",freshLife.Brain.AvoidanceConfidence==0&&freshLife.Brain.MemoryConfidence==0,new{positive=freshLife.Brain.MemoryConfidence,negative=freshLife.Brain.AvoidanceConfidence});
         var albino=Make(new(){AlbinoChance=1,AlbinoSpeedMultiplier=1.5f});Check("albino_hidden_skin",albino.Albino&&albino.Health==albino.MaxHealth&&albino.MaxHealth==180);
         var corpse=Make(new(){SwatDamage=100,RespawnMinSeconds=1,RespawnMaxSeconds=1});corpse.Hit(corpse.Position);corpse.CleanRemains();Advance(corpse,2);Check("cleaned_corpse_stays_clean",corpse.Dead&&!corpse.RemainsVisible);
+        Check("cleaned_corpse_cannot_reopen_death_menu",!PetApplication.ShouldKeepDeathMenu(true,corpse.Dead,corpse.RemainsVisible,false,true),new{corpse.Dead,corpse.RemainsVisible,mouseOverOldMenu=true});
+        Check("living_pet_cannot_open_death_menu",!PetApplication.ShouldKeepDeathMenu(true,false,true,false,true),new{dead=false,remainsVisible=true,mouseOverOldMenu=true});
         var flying=Make(new(){RestEnabled=false,HungerPerMinute=0});var resting=Make(new(){RestEnabled=false,HungerPerMinute=0,FlightFullnessCostPerSecond=0});
         flying.Fullness=resting.Fullness=20;
         Advance(flying,8);Advance(resting,8);
