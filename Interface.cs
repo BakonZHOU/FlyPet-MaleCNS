@@ -12,8 +12,8 @@ static class Theme
         =>new(){Text=text,Location=new(x,y),Size=new(w,h),Font=Font(size),ForeColor=color??Text,BackColor=Color.Transparent};
     public static Button Button(string text,int x,int y,int w,Action action,bool primary=false)
     {
-        var b=new Button{Text=text,Location=new(x,y),Size=new(w,38),FlatStyle=FlatStyle.Flat,Font=Font(),BackColor=primary?Accent:Panel,ForeColor=primary?Bg:Text,Cursor=Cursors.Hand};
-        b.FlatAppearance.BorderColor=Line;b.Click+=(_,_)=>action();return b;
+        var b=new Button{Text=text,Location=new(x,y),Size=new(w,38),FlatStyle=FlatStyle.Flat,Font=Font(10,primary?FontStyle.Bold:FontStyle.Regular),BackColor=primary?Accent:Panel,ForeColor=primary?Bg:Text,Cursor=Cursors.Hand,UseVisualStyleBackColor=false};
+        b.FlatAppearance.BorderColor=Line;b.FlatAppearance.MouseOverBackColor=primary?Color.FromArgb(218,229,169):Color.FromArgb(48,55,46);b.FlatAppearance.MouseDownBackColor=Color.FromArgb(111,129,87);b.Click+=(_,_)=>action();return b;
     }
     public static void Form(Form f){f.SuspendLayout();f.BackColor=Bg;f.ForeColor=Text;f.Font=Font();f.AutoScaleDimensions=new SizeF(96,96);f.AutoScaleMode=AutoScaleMode.Dpi;}
 }
@@ -30,11 +30,11 @@ public sealed class PreviewPanel : Panel
         for(int x=0;x<Width;x+=24)g.DrawLine(grid,x,0,x,Height);
         for(int y=0;y<Height;y+=24)g.DrawLine(grid,0,y,Width,y);
         float scale=DeviceDpi/96f;
-        using var line=new Pen(Theme.Line);g.DrawEllipse(line,Width/2-115*scale,Height/2-95*scale,230*scale,190*scale);
-        var sim=app.Sim;int sprite=(int)(300*scale);renderer.Draw(g,new(Width/2-sprite/2,Height/2-(int)(162*scale),sprite,sprite),sim,app.Area,false);
+        float orbit=Math.Min(Width,Height)*.38f;
+        using var line=new Pen(Theme.Line);g.DrawEllipse(line,Width/2-orbit,Height/2-orbit,orbit*2,orbit*2);
+        var sim=app.Sim;int sprite=(int)(Math.Min(Width,Height)*.94f);renderer.Draw(g,new(Width/2-sprite/2,Height/2-sprite/2,sprite,sprite),sim,app.Area,false);
         using var mono=new Font("Consolas",9);using var brush=new SolidBrush(Theme.Muted);
-        g.DrawString("SPECIMEN 01  /  DROSOPHILA",mono,brush,16*scale,16*scale);
-        g.DrawString("LOW POLY · LIVE NEURAL CIRCUIT",mono,brush,16*scale,Height-30*scale);
+        g.DrawString(app.Settings.Skin==PetSkin.Cockroach?"02 / PERIPLANETA":"01 / DROSOPHILA",mono,brush,12*scale,10*scale);
     }
     protected override void Dispose(bool disposing){if(disposing)renderer.Dispose();base.Dispose(disposing);}
 }
@@ -44,27 +44,40 @@ public sealed class Dashboard : Form
     readonly PetApplication app;
     readonly Label status,metrics;
     readonly PreviewPanel preview;
+    readonly Label heading,subtitle;
+    readonly Button flyButton,roachButton;
     bool exiting;
     public Dashboard(PetApplication app)
     {
-        this.app=app;Text="FlyPet · 果蝇桌宠 / 控制中心";Theme.Form(this);ClientSize=new(840,545);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
-        Controls.Add(Theme.Label("FLYPET   /   01",28,23,500,34,19,Theme.Accent));
-        Controls.Add(Theme.Label("一只住在桌面上的小苍蝇。",29,66,650,30,11,Theme.Muted));
-        preview=new(app){Location=new(28,115),Size=new(360,328)};Controls.Add(preview);
-        Controls.Add(Theme.Label("自由飞行，偶尔捣乱。",418,115,390,40,20));
-        Controls.Add(Theme.Label("投下一粒糖，看它靠近。\n鼠标靠近时它会躲开，直接点击苍蝇即可击中。\n生命归零后，在随机的时间重新醒来。",420,171,390,86,11,Theme.Muted));
-        status=Theme.Label("",420,272,390,34,13,Theme.Accent);Controls.Add(status);
-        metrics=Theme.Label("",420,311,390,65,9,Theme.Muted);Controls.Add(metrics);
-        Controls.Add(Theme.Button("放飞苍蝇  →",420,397,220,()=>{app.StartPet();Hide();},true));
-        Controls.Add(Theme.Button("设置",650,397,158,()=>app.ShowSettings()));
-        Controls.Add(Theme.Label("右下角托盘菜单管理全部功能  /  鼠标靠近会自动躲避",29,465,760,24,9,Theme.Muted));
-        Controls.Add(Theme.Label("真实连接子图 + 可调行为模型  ·  CPU 实时运行  ·  本地离线",29,496,760,22,9,Theme.Muted));
+        this.app=app;Text="FlyPet · 小窝";Theme.Form(this);ClientSize=new(590,310);FormBorderStyle=FormBorderStyle.FixedSingle;MaximizeBox=false;StartPosition=FormStartPosition.CenterScreen;
+        Controls.Add(Theme.Label("FLYPET  /  小窝",22,14,530,22,10,Theme.Accent));
+        heading=Theme.Label("",22,38,535,38,20);Controls.Add(heading);
+        subtitle=Theme.Label("",23,76,535,23,10,Theme.Muted);Controls.Add(subtitle);
+        preview=new(app){Location=new(22,108),Size=new(220,174)};Controls.Add(preview);
+        flyButton=Theme.Button("果蝇",262,112,128,()=>app.SelectSkin(PetSkin.Fly));Controls.Add(flyButton);
+        roachButton=Theme.Button("广东双马尾",399,112,169,()=>app.SelectSkin(PetSkin.Cockroach));Controls.Add(roachButton);
+        status=Theme.Label("",264,165,300,34,11,Theme.Accent);Controls.Add(status);
+        metrics=Theme.Label("",264,199,300,27,9,Theme.Muted);Controls.Add(metrics);
+        Controls.Add(Theme.Button("投糖",262,244,91,()=>{app.StartPet();app.SetMode(ToolMode.Sugar);Hide();}));
+        Controls.Add(Theme.Button("设置",364,244,91,()=>app.ShowSettings()));
+        Controls.Add(Theme.Button("大脑图",466,244,102,()=>app.ShowBrainMap()));
+        RefreshSkin();
         FormClosing+=(_,e)=>{if(!exiting){e.Cancel=true;Hide();}};ResumeLayout(false);
+    }
+    public void RefreshSkin()
+    {
+        bool roach=app.Settings.Skin==PetSkin.Cockroach;
+        Text=roach?"FlyPet · 广东双马尾的小窝":"FlyPet · 果蝇的小窝";
+        heading.Text=roach?"广东双马尾":"果蝇";
+        subtitle.Text=roach?"桌面散步，偶尔展翅":"在桌面自由飞行";
+        flyButton.BackColor=roach?Theme.Panel:Theme.Accent;flyButton.ForeColor=roach?Theme.Text:Theme.Bg;
+        roachButton.BackColor=roach?Theme.Accent:Theme.Panel;roachButton.ForeColor=roach?Theme.Bg:Theme.Text;
+        preview.Invalidate();RefreshStatus();
     }
     public void RefreshStatus()
     {
-        var s=app.Sim;status.Text=s.Dead?$"等待复活 · {s.DeathRemaining:0} 秒":$"{s.Behavior}  ·  生命 {s.Health:0}%  /  饱腹 {s.Fullness:0}%";
-        metrics.Text=$"{s.Brain.NeuronCount:N0} 神经元  /  {s.Brain.EdgeCount:N0} 连接\n模拟 {app.RealTimeRatio:0.00}×  ·  计算 {app.ComputeMs:0.00} ms/帧\n显示 {app.MeasuredFps:0} FPS  ·  {app.ModeLabel}";preview.Invalidate();
+        var s=app.Sim;status.Text=s.Dead?$"等待复活 · {s.DeathRemaining:0} 秒":app.BehaviorLabel;
+        metrics.Text=$"生命 {s.Health/s.MaxHealth*100:0}%   饱腹 {s.Fullness:0}%   {s.DisplaySize} px";preview.Invalidate();
     }
     public void Shutdown(){exiting=true;Close();}
 }
@@ -129,69 +142,145 @@ public sealed class SettingsWindow : Form
     readonly PetApplication app;
     readonly Dictionary<string,NumericUpDown> numbers=[];
     readonly CheckBox meters,startup,launch,pauseHidden,invincible,edge,neuralSteering,rest;
-    readonly ComboBox monitor;
+    readonly ComboBox monitor,skin;
+
+    public void SyncSkin(PetSkin value){if(!IsDisposed)skin.SelectedIndex=(int)value;}
+
     public SettingsWindow(PetApplication app)
     {
-        this.app=app;Theme.Form(this);Text="FlyPet · 设置";ClientSize=new(650,660);MinimumSize=new(650,660);StartPosition=FormStartPosition.CenterScreen;TopMost=true;
-        Controls.Add(Theme.Label("按你的节奏生活。",24,22,560,38,19,Theme.Accent));
-        Controls.Add(Theme.Label("应用后立即生效。高级参数保存在本地 JSON 中。",26,67,580,25,10,Theme.Muted));
-        var scroll=new Panel{Location=new(20,105),Size=new(610,430),AutoScroll=true,Anchor=AnchorStyles.Top|AnchorStyles.Left|AnchorStyles.Right|AnchorStyles.Bottom};Controls.Add(scroll);
-        int y=8;
-        void Num(string name,string label,decimal min,decimal max,decimal value,int decimals=0)
+        this.app=app;Theme.Form(this);Text="FlyPet · 外观与设置";
+        ClientSize=new(620,455);MinimumSize=new(520,390);StartPosition=FormStartPosition.CenterScreen;TopMost=true;
+
+        var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(14,12,14,10),BackColor=Theme.Bg};
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,54));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,43));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute,51));
+        Controls.Add(layout);
+        var header=new Label{Text="外观与设置",Dock=DockStyle.Fill,Font=Theme.Font(18,FontStyle.Bold),ForeColor=Theme.Accent,TextAlign=ContentAlignment.MiddleLeft};
+        layout.Controls.Add(header,0,0);
+
+        var nav=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.LeftToRight,WrapContents=false,AutoScroll=true,Margin=Padding.Empty};
+        layout.Controls.Add(nav,0,1);
+        var content=new Panel{Dock=DockStyle.Fill,Margin=new Padding(0,5,0,5),BackColor=Theme.Panel};
+        layout.Controls.Add(content,0,2);
+        var footer=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty};
+        layout.Controls.Add(footer,0,3);
+
+        string[] categories=["外观","生存","行为","神经","系统"];
+        var panels=new Dictionary<string,Panel>();
+        var tables=new Dictionary<string,TableLayoutPanel>();
+        var tabs=new Dictionary<string,Button>();
+        foreach(string category in categories)
         {
-            scroll.Controls.Add(Theme.Label(label,8,y+5,355,30));
+            var panel=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Visible=false,BackColor=Theme.Panel};
+            var table=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,RowCount=0,Padding=new Padding(12,8,12,8),BackColor=Theme.Panel};
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,64));
+            table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,36));
+            panel.Controls.Add(table);content.Controls.Add(panel);panels[category]=panel;tables[category]=table;
+            var tab=Theme.Button(category,0,0,92,()=>SelectCategory(category));
+            tab.Height=34;tab.Margin=new Padding(0,0,4,0);tabs[category]=tab;nav.Controls.Add(tab);
+        }
+        void SelectCategory(string category)
+        {
+            foreach(var entry in panels)entry.Value.Visible=entry.Key==category;
+            panels[category].BringToFront();
+            foreach(var entry in tabs)
+            {
+                bool active=entry.Key==category;
+                entry.Value.BackColor=active?Theme.Accent:Theme.Panel;
+                entry.Value.ForeColor=active?Theme.Bg:Theme.Text;
+                entry.Value.FlatAppearance.BorderColor=active?Theme.Accent:Theme.Line;
+            }
+        }
+        void Row(string category,Control label,Control editor,int height=43)
+        {
+            var table=tables[category];int index=table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute,height));
+            label.Dock=DockStyle.Fill;if(label is Label caption)caption.TextAlign=ContentAlignment.MiddleLeft;label.Margin=new Padding(2,0,8,0);
+            editor.Dock=DockStyle.Fill;editor.Margin=new Padding(2,6,2,6);
+            table.Controls.Add(label,0,index);table.Controls.Add(editor,1,index);
+        }
+        Label Caption(string value)=>new(){Text=value,ForeColor=Theme.Text,Font=Theme.Font(9.5f),AutoEllipsis=true};
+        void Num(string category,string name,string label,decimal min,decimal max,decimal value,int decimals=0)
+        {
             decimal increment=decimals switch{0=>1m,1=>.1m,2=>.01m,3=>.001m,_=>.0001m};
-            var n=new NumericUpDown{Location=new(390,y),Size=new(174,30),Minimum=min,Maximum=max,DecimalPlaces=decimals,Increment=increment,Value=value,BackColor=Theme.Panel,ForeColor=Theme.Text,BorderStyle=BorderStyle.FixedSingle};
-            numbers[name]=n;scroll.Controls.Add(n);y+=43;
+            var n=new NumericUpDown{Minimum=min,Maximum=max,DecimalPlaces=decimals,Increment=increment,Value=Math.Clamp(value,min,max),
+                BackColor=Theme.Bg,ForeColor=Theme.Text,BorderStyle=BorderStyle.FixedSingle,Font=Theme.Font(10)};
+            numbers[name]=n;Row(category,Caption(label),n);
+        }
+        CheckBox Check(string category,string label,bool value)
+        {
+            var c=new CheckBox{Text=label,Checked=value,ForeColor=Theme.Text,Font=Theme.Font(9.5f),AutoSize=false,Dock=DockStyle.Fill,Margin=new Padding(4,3,0,3)};
+            var table=tables[category];int index=table.RowCount++;
+            table.RowStyles.Add(new RowStyle(SizeType.Absolute,38));table.Controls.Add(c,0,index);table.SetColumnSpan(c,2);return c;
         }
         var s=app.Settings;
-        Num(nameof(s.FramesPerSecond),"显示帧率（FPS）",20,120,s.FramesPerSecond);
-        Num(nameof(s.PetSize),"苍蝇显示大小（像素）",Settings.MinPetSize,Settings.MaxPetSize,s.PetSize);
-        Num(nameof(s.FlightSpeed),"基础飞行速度（像素 / 秒）",30,900,(decimal)s.FlightSpeed);
-        Num(nameof(s.FearRadius),"鼠标威胁感知范围（像素）",80,800,(decimal)s.FearRadius);
-        Num(nameof(s.EscapeSafeRadiusMultiplier),"解除逃逸所需安全距离倍率",1,2.5m,(decimal)s.EscapeSafeRadiusMultiplier,2);
-        Num(nameof(s.EscapeAccelerationGain),"持续逃逸额外加速倍率",0,4,(decimal)s.EscapeAccelerationGain,2);
-        Num(nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
-        Num(nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,2);
-        Num(nameof(s.FlightFullnessCostPerSecond),"飞行每秒额外饱腹消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,3);
-        Num(nameof(s.AlarmSeconds),"受击后快速逃离持续秒数",.1m,10,(decimal)s.AlarmSeconds,1);
-        Num(nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,2);
-        Num(nameof(s.AlbinoChance),"白眼果蝇出现概率",0,1,(decimal)s.AlbinoChance,2);
-        Num(nameof(s.AlbinoSpeedMultiplier),"白眼果蝇速度倍率",1,3,(decimal)s.AlbinoSpeedMultiplier,2);
-        Num(nameof(s.RespawnMinSeconds),"随机复活最短等待（秒）",1,3600,(decimal)s.RespawnMinSeconds);
-        Num(nameof(s.RespawnMaxSeconds),"随机复活最长等待（秒）",1,7200,(decimal)s.RespawnMaxSeconds);
-        Num(nameof(s.NeuralGain),"连接增益（0 可消融突触传播）",0,4,(decimal)s.NeuralGain,1);
-        Num(nameof(s.SensoryGain),"感觉输入增益（0 可关闭输入）",0,4,(decimal)s.SensoryGain,1);
-        Num(nameof(s.SugarAttractionRadius),"糖的吸引范围（像素）",100,10000,(decimal)s.SugarAttractionRadius);
-        Num(nameof(s.SugarNutrition),"每块糖恢复的饱腹值",1,100,(decimal)s.SugarNutrition);
-        Num(nameof(s.SugarEatingSeconds),"吃完一块糖所需秒数",.2m,10,(decimal)s.SugarEatingSeconds,1);
-        Num(nameof(s.SatiatedThreshold),"开始回血的饱腹阈值",50,100,(decimal)s.SatiatedThreshold);
-        Num(nameof(s.SatiatedRegenPerSecond),"饱腹时每秒回血",0,20,(decimal)s.SatiatedRegenPerSecond,1);
-        Num(nameof(s.LearningRate),"奖励位置学习率",0,2,(decimal)s.LearningRate,2);
-        Num(nameof(s.MemoryDecayPerMinute),"位置记忆每分钟衰减",0,1,(decimal)s.MemoryDecayPerMinute,3);
-        Num(nameof(s.SugarReward),"吃糖奖励信号",0,2,(decimal)s.SugarReward,2);
-        Num(nameof(s.EdgePunishment),"撞击边缘负面信号",0,2,(decimal)s.EdgePunishment,2);
-        Num(nameof(s.CollisionMemoryDiameter),"单次撞击记忆直径（像素）",80,1200,(decimal)s.CollisionMemoryDiameter);
-        Num(nameof(s.MaxSugar),"最多保留糖粒数",1,30,s.MaxSugar);
-        scroll.Controls.Add(Theme.Label("桌宠所在显示器",8,y+4,300,32));
-        monitor=new(){Location=new(335,y),Size=new(228,30),DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Panel,ForeColor=Theme.Text};
-        for(int i=0;i<Screen.AllScreens.Length;i++){var screen=Screen.AllScreens[i];monitor.Items.Add($"{i+1} · {screen.Bounds.Width}×{screen.Bounds.Height}");}
-        monitor.SelectedIndex=Math.Min(s.MonitorIndex,monitor.Items.Count-1);scroll.Controls.Add(monitor);y+=45;
-        CheckBox Check(string label,bool value){var c=new CheckBox{Text=label,Checked=value,Location=new(8,y),Size=new(540,34),ForeColor=Theme.Text};scroll.Controls.Add(c);y+=39;return c;}
-        meters=Check("显示生命与饱腹条",s.ShowMeters);startup=Check("登录 Windows 时自动启动桌宠",s.StartWithWindows);
-        launch=Check("手动启动时显示启动菜单",s.ShowLaunchMenu);pauseHidden=Check("隐藏桌宠时暂停模拟，降低功耗",s.PauseWhenHidden);
-        invincible=Check("无敌模式（受击仍会逃离）",s.Invincible);
-        edge=Check("屏幕边缘视觉输入",s.EdgeSensing);neuralSteering=Check("神经转向读出（关闭为直接规则对照）",s.NeuralSteering);
-        rest=Check("允许停歇",s.RestEnabled);
-        scroll.Controls.Add(Theme.Label("饱腹 100 = 吃饱，0 = 饥饿；飞行会额外消耗。\n感觉编码与身体解码是工程模型，不是活体参数。",8,y+6,550,84,9,Theme.Muted));
-        Controls.Add(Theme.Button("应用设置",22,555,140,Apply,true));
-        Controls.Add(Theme.Button("恢复默认",174,555,140,ResetDefaults));
-        Controls.Add(Theme.Button("配置目录",326,555,140,()=>Process.Start(new ProcessStartInfo(Settings.Folder){UseShellExecute=true})));
-        // Closing the settings window commits the edited values as well, so an accidental
-        // click on the window X cannot make a change appear to be ignored.
-        Controls.Add(Theme.Button("关闭",478,555,150,Apply));
-        Controls.Add(Theme.Label("修改 JSON 后从托盘选择「重新加载配置」。",24,615,590,26,9,Theme.Muted));ResumeLayout(false);
+        skin=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Bg,ForeColor=Theme.Text};
+        skin.Items.AddRange(["果蝇","广东双马尾"]);skin.SelectedIndex=(int)s.Skin;Row("外观",Caption("桌宠外观"),skin);
+        Num("外观",nameof(s.PetSize),"果蝇大小 · px",Settings.MinPetSize,Settings.MaxPetSize,s.PetSize);
+        Num("外观",nameof(s.CockroachSize),"普通双马尾大小 · px",Settings.MinPetSize,Settings.MaxPetSize,s.CockroachSize);
+        Num("外观",nameof(s.GiantCockroachSize),"巨型双马尾大小 · px",Settings.MinPetSize,Settings.MaxPetSize,s.GiantCockroachSize);
+        Num("外观",nameof(s.GiantCockroachChance),"巨型双马尾出现概率",0,1,(decimal)s.GiantCockroachChance,2);
+        Num("外观",nameof(s.AlbinoChance),"白眼果蝇出现概率",0,1,(decimal)s.AlbinoChance,2);
+        Num("外观",nameof(s.AlbinoSpeedMultiplier),"稀有个体速度倍率",1,3,(decimal)s.AlbinoSpeedMultiplier,2);
+        meters=Check("外观","显示生命与饱腹条",s.ShowMeters);
+
+        Num("生存",nameof(s.HungerPerMinute),"每分钟饱腹下降",0,60,(decimal)s.HungerPerMinute,2);
+        Num("生存",nameof(s.FlightFullnessCostPerSecond),"活动每秒额外消耗",0,10,(decimal)s.FlightFullnessCostPerSecond,3);
+        Num("生存",nameof(s.StarvationDamagePerSecond),"饥饿时每秒失血",0,20,(decimal)s.StarvationDamagePerSecond,2);
+        Num("生存",nameof(s.SatiatedThreshold),"开始回血的饱腹值",50,100,(decimal)s.SatiatedThreshold);
+        Num("生存",nameof(s.SatiatedRegenPerSecond),"饱腹时每秒回血",0,20,(decimal)s.SatiatedRegenPerSecond,1);
+        Num("生存",nameof(s.RespawnMinSeconds),"复活最短等待 · 秒",1,3600,(decimal)s.RespawnMinSeconds);
+        Num("生存",nameof(s.RespawnMaxSeconds),"复活最长等待 · 秒",1,7200,(decimal)s.RespawnMaxSeconds);
+        Num("生存",nameof(s.SwatDamage),"每次拍打伤害",1,100,(decimal)s.SwatDamage);
+        invincible=Check("生存","无敌模式",s.Invincible);
+
+        Num("行为",nameof(s.FlightSpeed),"基础移动速度 · px/s",30,900,(decimal)s.FlightSpeed);
+        Num("行为",nameof(s.FearRadius),"鼠标威胁范围 · px",80,800,(decimal)s.FearRadius);
+        Num("行为",nameof(s.EscapeSafeRadiusMultiplier),"解除逃逸的距离倍率",1,2.5m,(decimal)s.EscapeSafeRadiusMultiplier,2);
+        Num("行为",nameof(s.EscapeAccelerationGain),"持续逃逸加速倍率",0,4,(decimal)s.EscapeAccelerationGain,2);
+        Num("行为",nameof(s.AlarmSeconds),"受击警觉持续 · 秒",.1m,10,(decimal)s.AlarmSeconds,1);
+        Num("行为",nameof(s.SugarAttractionRadius),"糖的感知距离 · px",100,10000,(decimal)s.SugarAttractionRadius);
+        Num("行为",nameof(s.SugarNutrition),"每块糖恢复饱腹",1,100,(decimal)s.SugarNutrition);
+        Num("行为",nameof(s.SugarEatingSeconds),"吃糖所需 · 秒",.2m,10,(decimal)s.SugarEatingSeconds,1);
+        Num("行为",nameof(s.MaxSugar),"最多保留糖粒数",1,30,s.MaxSugar);
+        rest=Check("行为","允许停歇",s.RestEnabled);
+
+        Num("神经",nameof(s.NeuralGain),"神经连接增益",0,4,(decimal)s.NeuralGain,1);
+        Num("神经",nameof(s.SensoryGain),"感觉输入增益",0,4,(decimal)s.SensoryGain,1);
+        Num("神经",nameof(s.LearningRate),"位置学习率",0,2,(decimal)s.LearningRate,2);
+        Num("神经",nameof(s.MemoryDecayPerMinute),"每分钟记忆衰减",0,1,(decimal)s.MemoryDecayPerMinute,3);
+        Num("神经",nameof(s.SugarReward),"吃糖奖励信号",0,2,(decimal)s.SugarReward,2);
+        Num("神经",nameof(s.EdgePunishment),"碰边负面信号",0,2,(decimal)s.EdgePunishment,2);
+        Num("神经",nameof(s.CollisionMemoryDiameter),"碰边记忆直径 · px",80,1200,(decimal)s.CollisionMemoryDiameter);
+        edge=Check("神经","屏幕边缘视觉输入",s.EdgeSensing);
+        neuralSteering=Check("神经","使用神经转向读出",s.NeuralSteering);
+
+        Num("系统",nameof(s.FramesPerSecond),"显示帧率 · FPS",20,120,s.FramesPerSecond);
+        monitor=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,BackColor=Theme.Bg,ForeColor=Theme.Text};
+        for(int i=0;i<Screen.AllScreens.Length;i++)
+        {
+            var screen=Screen.AllScreens[i];
+            monitor.Items.Add($"{i+1} · {screen.Bounds.Width}×{screen.Bounds.Height}");
+        }
+        monitor.SelectedIndex=Math.Min(s.MonitorIndex,monitor.Items.Count-1);Row("系统",Caption("所在显示器"),monitor);
+        startup=Check("系统","登录 Windows 时自动启动",s.StartWithWindows);
+        launch=Check("系统","手动启动时显示小窝",s.ShowLaunchMenu);
+        pauseHidden=Check("系统","隐藏时暂停模拟",s.PauseWhenHidden);
+
+        Button Footer(string text,int width,Action action,bool primary=false)
+        {
+            var button=Theme.Button(text,0,0,width,action,primary);button.Height=36;button.Margin=new Padding(6,5,0,0);footer.Controls.Add(button);return button;
+        }
+        Footer("取消",86,Close);
+        Footer("配置目录",105,()=>Process.Start(new ProcessStartInfo(Settings.Folder){UseShellExecute=true}));
+        Footer("恢复默认",105,ResetDefaults);
+        Footer("保存并应用",142,Apply,true);
+        SelectCategory("外观");ResumeLayout(false);
     }
+
     void ResetDefaults()
     {
         var defaults=new Settings();
@@ -201,17 +290,25 @@ public sealed class SettingsWindow : Form
             n.Value=Math.Clamp(Convert.ToDecimal(value),n.Minimum,n.Maximum);
         }
         monitor.SelectedIndex=Math.Min(defaults.MonitorIndex,monitor.Items.Count-1);
+        skin.SelectedIndex=(int)defaults.Skin;
         meters.Checked=defaults.ShowMeters;startup.Checked=defaults.StartWithWindows;launch.Checked=defaults.ShowLaunchMenu;pauseHidden.Checked=defaults.PauseWhenHidden;
         invincible.Checked=defaults.Invincible;edge.Checked=defaults.EdgeSensing;neuralSteering.Checked=defaults.NeuralSteering;rest.Checked=defaults.RestEnabled;
         Apply();
     }
+
     void Apply()
     {
         try
         {
             var s=app.Settings;
-            if(numbers[nameof(s.RespawnMaxSeconds)].Value<numbers[nameof(s.RespawnMinSeconds)].Value){MessageBox.Show(this,"最长等待不能小于最短等待。","设置");return;}
-            foreach(var (name,n) in numbers){var p=typeof(Settings).GetProperty(name)!;p.SetValue(s,Convert.ChangeType(n.Value,p.PropertyType));}
+            if(numbers[nameof(s.RespawnMaxSeconds)].Value<numbers[nameof(s.RespawnMinSeconds)].Value)
+            {MessageBox.Show(this,"最长复活等待不能小于最短等待。","设置");return;}
+            foreach(var (name,n) in numbers)
+            {
+                var p=typeof(Settings).GetProperty(name)!;
+                p.SetValue(s,Convert.ChangeType(n.Value,p.PropertyType));
+            }
+            if(s.Skin!=(PetSkin)skin.SelectedIndex)app.SelectSkin((PetSkin)skin.SelectedIndex);
             s.MonitorIndex=monitor.SelectedIndex;s.ShowMeters=meters.Checked;s.ShowLaunchMenu=launch.Checked;s.PauseWhenHidden=pauseHidden.Checked;
             s.Invincible=invincible.Checked;s.EdgeSensing=edge.Checked;s.NeuralSteering=neuralSteering.Checked;s.RestEnabled=rest.Checked;
             using var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");

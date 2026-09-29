@@ -33,21 +33,31 @@ internal static class Native
 public sealed class LayerWindow : Form
 {
     Bitmap canvas;
-    public LayerWindow(int size,string name)
+    public LayerWindow(int size,string name):this(size,size,name){}
+    public LayerWindow(int width,int height,string name)
     {
         Text=name;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;AutoScaleMode=AutoScaleMode.None;
-        StartPosition=FormStartPosition.Manual;Size=new(size,size);canvas=new(size,size,PixelFormat.Format32bppPArgb);
+        StartPosition=FormStartPosition.Manual;Size=new(width,height);canvas=new(width,height,PixelFormat.Format32bppPArgb);
     }
     protected override bool ShowWithoutActivation=>true;
     protected override CreateParams CreateParams {get{var p=base.CreateParams;p.ExStyle|=0x80000|0x20|0x80|0x08000000;return p;}}
     public void Render(int x,int y,int size,Action<Graphics> draw)
+        =>Render(x,y,size,size,draw);
+    public void Render(int x,int y,int width,int height,Action<Graphics> draw)
     {
-        if(canvas.Width!=size){canvas.Dispose();canvas=new(size,size,PixelFormat.Format32bppPArgb);Size=new(size,size);}
+        if(canvas.Width!=width||canvas.Height!=height)
+        {
+            canvas.Dispose();canvas=new(width,height,PixelFormat.Format32bppPArgb);
+            // A layered window's bitmap and native bounds must grow together. A
+            // managed Size change alone can leave the old hit/placement bounds.
+            SetBounds(x,y,width,height,BoundsSpecified.All);
+            Native.SetWindowPos(Handle,0,x,y,width,height,0x0004|0x0010);
+        }
         using(var g=Graphics.FromImage(canvas)){g.Clear(Color.Transparent);draw(g);}
         nint screen=Native.GetDC(0),mem=Native.CreateCompatibleDC(screen),bmp=canvas.GetHbitmap(Color.FromArgb(0)),old=Native.SelectObject(mem,bmp);
         try
         {
-            var point=new Native.POINT(x,y);var source=new Native.POINT();var dimensions=new Native.SIZE(size,size);var blend=new Native.BLEND{Alpha=255,Format=1};
+            var point=new Native.POINT(x,y);var source=new Native.POINT();var dimensions=new Native.SIZE(width,height);var blend=new Native.BLEND{Alpha=255,Format=1};
             if(!Native.UpdateLayeredWindow(Handle,screen,ref point,ref dimensions,mem,ref source,0,ref blend,2))throw new Win32Exception();
         }
         finally {Native.SelectObject(mem,old);Native.DeleteObject(bmp);Native.DeleteDC(mem);Native.ReleaseDC(0,screen);}

@@ -10,6 +10,8 @@ public sealed class Sugar(Vector2 position)
     public bool TryConsume(){if(Consumed)return false;Consumed=true;Amount=0;return true;}
 }
 
+public enum DeathCause { None, Swatted, Starved }
+
 public sealed class Simulation
 {
     public readonly Brain Brain;
@@ -18,10 +20,15 @@ public sealed class Simulation
     public float Heading,Health=100,Fullness=65,DeathRemaining,HitFlash,Time,Alarm,InjuryArousal,RestRemaining;
     public bool Dead=>Health<=0;
     public bool Albino { get; private set; }
+    public int DisplaySize => Settings.Skin==PetSkin.Cockroach ? (Dead?Math.Min(120,Settings.CockroachSize):Albino?Settings.GiantCockroachSize:Settings.CockroachSize) : Settings.PetSize;
     public bool AlbinoSpawnedPending { get; private set; }
     public bool RemainsVisible { get; private set; } = true;
     public float MaxHealth => Albino ? 180 : 100;
     public bool Grounded {get;private set;}
+    public bool CockroachFlying {get;private set;}
+    public DeathCause CauseOfDeath {get;private set;}
+    public float SpeechRemaining {get;private set;}
+    float speechDelay=6;
     public float EscapeUrgency {get;private set;}
     public float EscapeDistanceRate {get;private set;}
     public bool RapidEscapeTurn=>rapidTurnRemaining>0;
@@ -41,19 +48,26 @@ public sealed class Simulation
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
     public bool Hit(Vector2 point)
     {
-        if(Dead||hitCooldown>0||Vector2.Distance(point,Position)>Settings.PetSize*.29f+20)return false;
+        if(Dead||hitCooldown>0||Vector2.Distance(point,Position)>DisplaySize*.29f+20)return false;
         HitFlash=.28f;hitCooldown=.22f;Alarm=1;InjuryArousal=Math.Min(1,InjuryArousal+.30f);RestRemaining=0;
         if(!Settings.Invincible)Health=Math.Max(0,Health-Settings.SwatDamage*(Albino ? .58f : 1));
-        if(Dead)Die("被拍死");
+        if(Dead)Die(DeathCause.Swatted);
         return true;
     }
-    void Die(string reason){RemainsVisible=true;DeathRemaining=Settings.RespawnMinSeconds+(float)random.NextDouble()*(Settings.RespawnMaxSeconds-Settings.RespawnMinSeconds);Behavior=reason;Grounded=true;Velocity=Vector2.Zero;}
-    void RollSkin(){Albino=random.NextDouble()<Settings.AlbinoChance;AlbinoSpawnedPending=Albino;RemainsVisible=true;}
+    void Die(DeathCause cause){CauseOfDeath=cause;RemainsVisible=true;DeathRemaining=Settings.RespawnMinSeconds+(float)random.NextDouble()*(Settings.RespawnMaxSeconds-Settings.RespawnMinSeconds);Behavior=cause==DeathCause.Swatted?"被拍死":"饥饿死亡";Grounded=true;CockroachFlying=false;SpeechRemaining=0;Velocity=Vector2.Zero;}
+    void RollSkin(){Albino=random.NextDouble()<(Settings.Skin==PetSkin.Cockroach?Settings.GiantCockroachChance:Settings.AlbinoChance);AlbinoSpawnedPending=Albino;RemainsVisible=true;}
+    public void ChangeSkin(PetSkin skin)
+    {
+        if(Settings.Skin==skin)return;
+        float healthRatio=Health/MaxHealth;
+        Settings.Skin=skin;RollSkin();Health=Dead?0:Math.Max(1,healthRatio*MaxHealth);
+        CockroachFlying=false;SpeechRemaining=0;speechDelay=skin==PetSkin.Cockroach?2.5f:6;
+    }
     public bool ConsumeAlbinoAnnouncement(){if(!AlbinoSpawnedPending)return false;AlbinoSpawnedPending=false;return true;}
     public void CleanRemains(){if(Dead){RemainsVisible=false;DeathRemaining=0;Behavior="已清理";}}
     public void Revive(Rectangle area)
     {
-        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=edgeShock=rewardPulse=punishmentPulse=feedingElapsed=escapeIntegral=escapeSafeTime=rapidTurnRemaining=rapidTurnCooldown=EscapeUrgency=EscapeDistanceRate=0;previousMouseDistance=float.NaN;escapeActive=false;rapidTurnSign=0;feedingSugar=null;Brain.Reset();Brain.ClearMemory();Recenter(area);
+        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;CauseOfDeath=DeathCause.None;CockroachFlying=false;SpeechRemaining=0;speechDelay=5;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=edgeShock=rewardPulse=punishmentPulse=feedingElapsed=escapeIntegral=escapeSafeTime=rapidTurnRemaining=rapidTurnCooldown=EscapeUrgency=EscapeDistanceRate=0;previousMouseDistance=float.NaN;escapeActive=false;rapidTurnSign=0;feedingSugar=null;Brain.Reset();Brain.ClearMemory();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
     public void Update(float dt,Rectangle area,Vector2 mouse,bool cursorThreat)
@@ -61,10 +75,17 @@ public sealed class Simulation
         Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;rapidTurnRemaining=Math.Max(0,rapidTurnRemaining-dt);rapidTurnCooldown=Math.Max(0,rapidTurnCooldown-dt);
         edgeShock=Math.Max(0,edgeShock-dt*2.5f);rewardPulse=Math.Max(0,rewardPulse-dt*.7f);punishmentPulse=Math.Max(0,punishmentPulse-dt*1.2f);
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
+        if(Settings.Skin==PetSkin.Cockroach)
+        {
+            SpeechRemaining=Math.Max(0,SpeechRemaining-dt);
+            speechDelay-=dt;
+            if(speechDelay<=0){SpeechRemaining=3.2f;speechDelay=45+(float)random.NextDouble()*35;}
+        }
+        else SpeechRemaining=0;
         Alarm=Math.Max(0,Alarm-dt/Settings.AlarmSeconds);
         Fullness=Math.Max(0,Fullness-Settings.HungerPerMinute/60*dt-(Grounded?0:Settings.FlightFullnessCostPerSecond)*Brain.Flight*dt);
         if(Fullness>=Settings.SatiatedThreshold&&Health<MaxHealth)Health=Math.Min(MaxHealth,Health+Settings.SatiatedRegenPerSecond*dt);
-        if(Fullness<=.01f&&!Settings.Invincible){Health=Math.Max(0,Health-Settings.StarvationDamagePerSecond*dt);if(Dead){Die("饥饿死亡");return;}}
+        if(Fullness<=.01f&&!Settings.Invincible){Health=Math.Max(0,Health-Settings.StarvationDamagePerSecond*dt);if(Dead){Die(DeathCause.Starved);return;}}
         foreach(var sugar in Sugars)sugar.Age+=dt;
         Sugars.RemoveAll(s=>s.Consumed||s.Amount<=0||s.Age>600);
         Sugar? food=null;float foodDist=float.MaxValue;
@@ -163,6 +184,12 @@ public sealed class Simulation
         if(Grounded)flightDuration=0;else flightDuration+=dt;
         var direction=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));
         Velocity=Vector2.Lerp(Velocity,direction*speed,1-MathF.Exp(-8*dt));Position+=Velocity*dt;
+        if(Settings.Skin==PetSkin.Cockroach)
+        {
+            float relativeSpeed=Velocity.Length()/Math.Max(1,Settings.FlightSpeed*(Albino?Settings.AlbinoSpeedMultiplier:1));
+            CockroachFlying=contact||resting?false:CockroachFlying?relativeSpeed>.85f:relativeSpeed>1.25f;
+        }
+        else CockroachFlying=false;
         bool collided=ClampPosition(area);
         if(collided)
         {
@@ -185,7 +212,7 @@ public sealed class Simulation
     }
     bool ClampPosition(Rectangle area)
     {
-        float margin=Math.Min(Settings.PetSize*.32f,Math.Min(area.Width,area.Height)*.2f);
+        float margin=Math.Min(DisplaySize*.32f,Math.Min(area.Width,area.Height)*.2f);
         var old=Position;Position=new(Math.Clamp(Position.X,area.Left+margin,area.Right-margin),Math.Clamp(Position.Y,area.Top+margin,area.Bottom-margin));
         if(old==Position)return false;
         var normal=Position-old;if(normal.LengthSquared()>.001f){normal=Vector2.Normalize(normal);Velocity=Vector2.Reflect(Velocity,normal)*.42f;Heading=MathF.Atan2(normal.Y,normal.X)+MathF.PI/2;}else Velocity*=.25f;

@@ -15,10 +15,24 @@ static class SelfTest
         var data=CircuitData.Load();var area=new Rectangle(0,0,1920,1080);var mouse=new Vector2(-5000,-5000);
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
-        var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance});
+        var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f&&Math.Abs(defaults.GiantCockroachChance-.1f)<.0001f&&defaults.RespawnMinSeconds==45&&defaults.RespawnMaxSeconds==90&&100/defaults.StarvationDamagePerSecond>=1200,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance,giantChance=defaults.GiantCockroachChance,respawnMin=defaults.RespawnMinSeconds,respawnMax=defaults.RespawnMaxSeconds,starvationMinutes=100/defaults.StarvationDamagePerSecond/60});
         var enlarged=new Settings{PetSize=400};enlarged.Validate();Check("pet_size_400_is_preserved",enlarged.PetSize==400,new{size=enlarged.PetSize,max=Settings.MaxPetSize});
+        var giantSettings=new Settings{Skin=PetSkin.Cockroach,CockroachSize=120,GiantCockroachSize=700};giantSettings.Validate();
+        Check("giant_size_700_is_preserved",giantSettings.GiantCockroachSize==700,new{size=giantSettings.GiantCockroachSize,max=Settings.MaxPetSize});
+        var normalProbe=Make(new(){Skin=PetSkin.Cockroach,CockroachSize=120,GiantCockroachSize=700,GiantCockroachChance=0});
+        var giantProbe=Make(new(){Skin=PetSkin.Cockroach,CockroachSize=120,GiantCockroachSize=700,GiantCockroachChance=1});
+        Check("cockroach_rare_roll_and_sizes",!normalProbe.Albino&&normalProbe.DisplaySize==120&&giantProbe.Albino&&giantProbe.DisplaySize==700,new{normal=normalProbe.DisplaySize,giant=giantProbe.DisplaySize});
+        giantProbe.Velocity=new(700,0);giantProbe.Update(1f/120,area,mouse,false);
+        bool giantWalksAtOrdinarySpeed=!giantProbe.CockroachFlying;
+        giantProbe.Velocity=new(1100,0);giantProbe.Update(1f/120,area,mouse,false);
+        bool giantOpensWingsAtHighSpeed=giantProbe.CockroachFlying;
+        giantProbe.Velocity=new(120,0);giantProbe.Update(1f/120,area,mouse,false);
+        Check("giant_can_walk_fly_and_land",giantWalksAtOrdinarySpeed&&giantOpensWingsAtHighSpeed&&!giantProbe.CockroachFlying,new{giantWalksAtOrdinarySpeed,giantOpensWingsAtHighSpeed,landed=!giantProbe.CockroachFlying});
+        var roamingGiant=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=1});bool walkedNaturally=false,flewNaturally=false;
+        for(int i=0;i<2400;i++){roamingGiant.Update(1f/120,area,mouse,false);walkedNaturally|=!roamingGiant.CockroachFlying&&roamingGiant.Velocity.Length()>10;flewNaturally|=roamingGiant.CockroachFlying;}
+        Check("giant_roams_on_legs_and_flies",walkedNaturally&&flewNaturally,new{walkedNaturally,flewNaturally});
         float minimumDefaultLifetimeSeconds=65/(defaults.HungerPerMinute/60+defaults.FlightFullnessCostPerSecond)+100/defaults.StarvationDamagePerSecond;
-        Check("default_hunger_survives_over_ten_minutes",minimumDefaultLifetimeSeconds>=600,new{seconds=minimumDefaultLifetimeSeconds,minutes=minimumDefaultLifetimeSeconds/60});
+        Check("default_hunger_survives_over_twenty_minutes",minimumDefaultLifetimeSeconds>=1200,new{seconds=minimumDefaultLifetimeSeconds,minutes=minimumDefaultLifetimeSeconds/60});
         Check("expanded_connectome_loaded",data.Nodes.Length==16711&&data.Edges.Length>2000000,new{neurons=data.Nodes.Length,edges=data.Edges.Length});
         Check("expanded_functional_groups",new[]{"visual_motion","olfactory","memory","reward","navigation","descending","motor"}.All(g=>data.Nodes.Any(n=>n.Groups.Contains(g))),new{olfactory=data.Nodes.Count(n=>n.Groups.Contains("olfactory")),memory=data.Nodes.Count(n=>n.Groups.Contains("memory")),navigation=data.Nodes.Count(n=>n.Groups.Contains("navigation")),descending=data.Nodes.Count(n=>n.Groups.Contains("descending"))});
         (float turn,float opto) ProbeTurn(float turn){var b=new Brain(data);var s=new Settings();b.SetInput(0,0,20,turn,.95f,0,s);for(int i=0;i<2000;i++)b.Step(1);return (b.Turn,b.OptomotorTurn);}
@@ -57,9 +71,9 @@ static class SelfTest
         Check("escape_persists_past_detection_radius",adaptiveEscape.Brain.ThreatDrive>.1f&&adaptiveEscape.EscapeUrgency>.1f,new{threatDrive=adaptiveEscape.Brain.ThreatDrive,urgency=adaptiveEscape.EscapeUrgency});
         for(int i=0;i<90;i++)adaptiveEscape.Update(1f/120,area,adaptiveEscape.Position+new Vector2(adaptiveEscape.Settings.FearRadius*adaptiveEscape.Settings.EscapeSafeRadiusMultiplier*1.2f,0),true);
         Check("escape_releases_after_safe_distance",adaptiveEscape.EscapeUrgency<.01f,new{urgency=adaptiveEscape.EscapeUrgency,distanceRate=adaptiveEscape.EscapeDistanceRate});
-        var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
+        var dying=Make(new(){RespawnMinSeconds=1,RespawnMaxSeconds=2,SwatDamage=100});Check("swat_kills",dying.Hit(dying.Position)&&dying.Dead&&dying.CauseOfDeath==DeathCause.Swatted&&dying.DeathRemaining>=1&&dying.DeathRemaining<=2);
         Advance(dying,2.1f);Check("random_respawn",!dying.Dead&&dying.Health==100);
-        var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead);
+        var starving=Make(new(){StarvationDamagePerSecond=10});starving.Fullness=0;starving.Health=1;Advance(starving,.2f);Check("starvation_kills",starving.Dead&&starving.CauseOfDeath==DeathCause.Starved);
         var capped=Make(new(){MaxSugar=3});for(int i=0;i<20;i++)capped.AddSugar(new(i,i));Check("bounded_food",capped.Sugars.Count==3);
         var bounds=Make();bounds.Position=new(-99999,99999);Advance(bounds,.02f);Check("display_bounds",area.Contains((int)bounds.Position.X,(int)bounds.Position.Y));
         var edgeOn=Make();edgeOn.Position=new(area.Left+65,area.Top+area.Height*.5f);Advance(edgeOn,.02f);
@@ -112,6 +126,45 @@ static class SelfTest
             renderer.Draw(g,new(x+40,y+4,280,280),s,area,true);g.DrawString(v.Item1,small,muted,x+18,y+277);
         }
         image.Save(Path.Combine(output,"appearance.png"),ImageFormat.Png);
+        using(var deathImage=new Bitmap(900,350))using(var dg=Graphics.FromImage(deathImage))
+        {
+            dg.Clear(Theme.Bg);
+            var flyStarved=Make(new(){StarvationDamagePerSecond=10});flyStarved.Fullness=0;flyStarved.Health=1;Advance(flyStarved,.2f);
+            var flySwatted=Make(new(){SwatDamage=100});flySwatted.Hit(flySwatted.Position);
+            var roachDead=Make(new(){Skin=PetSkin.Cockroach,GiantCockroachChance=1,SwatDamage=100});roachDead.Health=1;roachDead.Hit(roachDead.Position);
+            Check("roach_death_leaves_small_remains",roachDead.Dead&&roachDead.DisplaySize==120,new{roachDead.CauseOfDeath,size=roachDead.DisplaySize});
+            var samples=new[]{("果蝇 · 饿死",flyStarved),("果蝇 · 拍死",flySwatted),("双马尾 · 白卵",roachDead)};
+            for(int i=0;i<samples.Length;i++)
+            {
+                int x=i*300;using var tile=new SolidBrush(Theme.Panel);dg.FillRectangle(tile,x+5,6,290,338);
+                renderer.Draw(dg,new(x+34,22,230,230),samples[i].Item2,area,false);
+                using var caption=Theme.Font(9);dg.DrawString(samples[i].Item1,caption,muted,x+22,276);
+            }
+            deathImage.Save(Path.Combine(output,"death-appearance.png"),ImageFormat.Png);
+        }
+        using(var bubbleImage=new Bitmap(340,58))using(var bg=Graphics.FromImage(bubbleImage))
+        {bg.Clear(Color.Transparent);FlyRenderer.DrawSpeechBubble(bg);bubbleImage.Save(Path.Combine(output,"speech-bubble.png"),ImageFormat.Png);}
+        using(var roachImage=new Bitmap(1000,800))using(var rg=Graphics.FromImage(roachImage))
+        {
+            using var roachTitle=Theme.Font(17);rg.Clear(Theme.Bg);rg.DrawString("FLYPET / 广东双马尾 · 奔跑与飞行",roachTitle,titleBrush,24,18);
+            for(int i=0;i<4;i++)
+            {
+                int x=24+i%2*488,y=74+i/2*350;
+                using var tile=new SolidBrush(Theme.Panel);rg.FillRectangle(tile,x,y,464,330);
+                var rs=Make(new(){Skin=PetSkin.Cockroach,CockroachSize=120,GiantCockroachSize=500,GiantCockroachChance=i>=2?1:0});
+                rs.Time=.15f+i*.12f;rs.Heading=i%2==0?0:.38f;
+                rs.Velocity=i%2==0?new Vector2(130,0):new Vector2(1100,0);
+                rs.Update(1f/120,area,mouse,false);
+                int sprite=i<2?200:290;renderer.Draw(rg,new(x+(464-sprite)/2,y+8,sprite,sprite),rs,area,false);
+                rg.DrawString(i<2?(i==0?"普通 · 奔跑":"普通 · 飞行"):(i==2?"巨型 · 奔跑":"巨型 · 飞行"),small,muted,x+20,y+294);
+            }
+            roachImage.Save(Path.Combine(output,"cockroach-appearance.png"),ImageFormat.Png);
+        }
+        using(var layer=new LayerWindow(120,"size-check"))
+        {
+            layer.Render(100,100,700,g=>g.Clear(Color.Transparent));
+            Check("layer_window_reaches_700",layer.Width==700&&layer.Height==700,new{layer.Width,layer.Height});
+        }
         var renderWatch=Stopwatch.StartNew();for(int i=0;i<300;i++){sim.Time+=.016f;renderer.Draw(g,new(0,0,180,180),sim,area);}renderWatch.Stop();
         Check("render_budget_90fps",renderWatch.Elapsed.TotalMilliseconds/300<11.12,new{averageMs=renderWatch.Elapsed.TotalMilliseconds/300});
         File.WriteAllText(Path.Combine(output,"results.json"),JsonSerializer.Serialize(new{passed=failures==0,failures,tests=results},Settings.JsonOptions));

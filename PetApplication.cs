@@ -15,6 +15,7 @@ public sealed class PetApplication : ApplicationContext
     public Rectangle Area => Screen.AllScreens[Math.Min(Settings.MonitorIndex,Screen.AllScreens.Length-1)].WorkingArea;
     public ToolMode Mode {get;private set;}
     public string ModeLabel=>Mode==ToolMode.Sugar?"投糖模式 · 点击桌面放置一粒糖":"普通模式 · 始终躲避鼠标";
+    public string BehaviorLabel=>Settings.Skin==PetSkin.Cockroach&&Sim.Behavior=="自由飞行"&&!Sim.CockroachFlying?"桌面奔跑":Sim.Behavior;
     public bool Paused {get;private set;}
     bool visible,disposing;
     public double ComputeMs {get;private set;}
@@ -25,10 +26,11 @@ public sealed class PetApplication : ApplicationContext
     NeuralEvidenceWindow? evidenceWindow;
     BrainMapWindow? brainMap;
     DeathMenuWindow? deathMenu;
-    readonly LayerWindow pet,cursor;
+    readonly LayerWindow pet,cursor,speech;
     readonly List<LayerWindow> sugarWindows=[];
     readonly FlyRenderer renderer=new();
     readonly NotifyIcon tray;
+    readonly ToolStripMenuItem flySkinItem,roachSkinItem;
     readonly Icon icon;
     readonly MouseHook mouseHook;
     readonly LocalControl localControl;
@@ -43,7 +45,7 @@ public sealed class PetApplication : ApplicationContext
     {
         Settings=Settings.Load();Directory.CreateDirectory(Settings.Folder);Circuit=CircuitData.Load();
         Sim=new(Settings,Circuit);Sim.Recenter(Area);
-        pet=new(Settings.PetSize,"FlyPet · 苍蝇");cursor=new(84,"FlyPet · 工具指针");
+        pet=new(Sim.DisplaySize,"FlyPet · 桌宠");cursor=new(84,"FlyPet · 工具指针");speech=new(340,58,"FlyPet · 气泡");
         dashboard=new(this);
         _=dashboard.Handle;
         localControl=new(dashboard,Command);
@@ -54,15 +56,25 @@ public sealed class PetApplication : ApplicationContext
         }
         dashboard.Icon=icon;
         var menu=new ContextMenuStrip();menu.Items.Add("显示 / 隐藏桌宠",null,(_,_)=>ToggleVisible());
-        menu.Items.Add("启动菜单",null,(_,_)=>Defer(ShowDashboard));menu.Items.Add("大脑活动图…",null,(_,_)=>Defer(ShowBrainMap));menu.Items.Add("设置…",null,(_,_)=>Defer(ShowSettings));menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("投放糖",null,(_,_)=>{StartPet();SetMode(ToolMode.Sugar);});
+        menu.Items.Add("投放糖粒",null,(_,_)=>{StartPet();SetMode(ToolMode.Sugar);});
+        menu.Items.Add("打开小窝",null,(_,_)=>Defer(ShowDashboard));
+        menu.Items.Add("外观与设置…",null,(_,_)=>Defer(ShowSettings));
+        var skins=new ToolStripMenuItem("切换外观");menu.Items.Add(skins);
+        flySkinItem=new ToolStripMenuItem("果蝇"){Checked=Settings.Skin==PetSkin.Fly};
+        roachSkinItem=new ToolStripMenuItem("广东双马尾"){Checked=Settings.Skin==PetSkin.Cockroach};
+        flySkinItem.Click+=(_,_)=>SelectSkin(PetSkin.Fly);roachSkinItem.Click+=(_,_)=>SelectSkin(PetSkin.Cockroach);
+        skins.DropDownItems.Add(flySkinItem);skins.DropDownItems.Add(roachSkinItem);
         menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
+        menu.Items.Add(new ToolStripSeparator());
+        var more=new ToolStripMenuItem("更多操作");menu.Items.Add(more);
         var meterItem=new ToolStripMenuItem("显示状态条"){Checked=Settings.ShowMeters,CheckOnClick=true};meterItem.CheckedChanged+=(_,_)=>{Settings.ShowMeters=meterItem.Checked;Settings.Save();};menu.Items.Add(meterItem);
         var invincibleItem=new ToolStripMenuItem("无敌模式"){Checked=Settings.Invincible,CheckOnClick=true};invincibleItem.CheckedChanged+=(_,_)=>{Settings.Invincible=invincibleItem.Checked;Settings.Save();};menu.Items.Add(invincibleItem);
-        menu.Items.Add("立即复活",null,(_,_)=>Sim.Revive(Area));
-        menu.Items.Add("清除糖粒",null,(_,_)=>Sim.Sugars.Clear());menu.Items.Add("召回桌宠",null,(_,_)=>{Sim.Recenter(Area);StartPet();});
-        menu.Items.Add("重新加载配置",null,(_,_)=>ReloadSettings());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("退出 FlyPet",null,(_,_)=>ExitThread());
-        tray=new NotifyIcon{Icon=icon,Text="FlyPet · 果蝇桌宠",ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(_,_)=>ShowDashboard();
+        menu.Items.Remove(meterItem);menu.Items.Remove(invincibleItem);more.DropDownItems.Add(meterItem);more.DropDownItems.Add(invincibleItem);
+        more.DropDownItems.Add("立即复活",null,(_,_)=>Sim.Revive(Area));
+        more.DropDownItems.Add("清除糖粒",null,(_,_)=>Sim.Sugars.Clear());more.DropDownItems.Add("召回桌宠",null,(_,_)=>{Sim.Recenter(Area);StartPet();});
+        more.DropDownItems.Add("大脑活动图…",null,(_,_)=>Defer(ShowBrainMap));
+        more.DropDownItems.Add("重新加载配置",null,(_,_)=>ReloadSettings());menu.Items.Add("退出 FlyPet",null,(_,_)=>ExitThread());
+        tray=new NotifyIcon{Icon=icon,Text="FlyPet · 桌宠",ContextMenuStrip=menu,Visible=true};tray.DoubleClick+=(_,_)=>ShowDashboard();
         mouseHook=new(OnMouseDown);
         Native.timeBeginPeriod(1);timer.Interval=TimerInterval();timer.Tick+=Tick;timer.Start();
         if(quiet||!Settings.ShowLaunchMenu)StartPet();else ShowDashboard();
@@ -97,6 +109,9 @@ public sealed class PetApplication : ApplicationContext
         {
             case "menu":ShowDashboard();break;
             case "settings":ShowSettings();break;
+            case "skin":
+                if(args.Length!=2||args[1] is not ("fly" or "cockroach"))throw new ArgumentException("Expected skin fly|cockroach");
+                SelectSkin(args[1]=="fly"?PetSkin.Fly:PetSkin.Cockroach);break;
             case "evidence":ShowEvidence();break;
             case "brain-map":ShowBrainMap();break;
             case "show":StartPet();break;
@@ -120,27 +135,35 @@ public sealed class PetApplication : ApplicationContext
                 shutdown.Tick+=(_,_)=>{shutdown.Stop();shutdown.Dispose();ExitThread();};shutdown.Start();return new{ok=true};
             default:throw new ArgumentException("Unknown command");
         }
-        return new{ok=true,visible,paused=Paused,mode=Mode.ToString(),health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,x=Sim.Position.X,y=Sim.Position.Y,fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,area=new{Area.X,Area.Y,Area.Width,Area.Height}};
+        return new{ok=true,visible,paused=Paused,mode=Mode.ToString(),skin=Settings.Skin.ToString(),size=Sim.DisplaySize,rare=Sim.Albino,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,cockroachFlying=Sim.CockroachFlying,dead=Sim.Dead,deathCause=Sim.CauseOfDeath.ToString(),respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,x=Sim.Position.X,y=Sim.Position.Y,fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,area=new{Area.X,Area.Y,Area.Width,Area.Height}};
     }
     public void ShowSettings(){SetMode(ToolMode.Normal);if(settingsWindow==null||settingsWindow.IsDisposed)settingsWindow=new(this);settingsWindow.Show();settingsWindow.WindowState=FormWindowState.Normal;settingsWindow.BringToFront();settingsWindow.Activate();}
+    public void SelectSkin(PetSkin skin)
+    {
+        Sim.ChangeSkin(skin);Settings.Save();dashboard.RefreshSkin();
+        settingsWindow?.SyncSkin(skin);
+        deathMenu?.SetSkin(skin);
+        flySkinItem.Checked=skin==PetSkin.Fly;roachSkinItem.Checked=skin==PetSkin.Cockroach;
+        tray.Text=skin==PetSkin.Fly?"FlyPet · 果蝇桌宠":"FlyPet · 广东双马尾";
+    }
     public void StartPet(){visible=true;Paused=false;pet.Show();}
     public void ToggleVisible()
     {
         visible=!visible;
-        if(visible){pet.Show();}else{SetMode(ToolMode.Normal);pet.Hide();foreach(var w in sugarWindows)w.Hide();}
+        if(visible){pet.Show();}else{SetMode(ToolMode.Normal);pet.Hide();speech.Hide();foreach(var w in sugarWindows)w.Hide();}
     }
     public void TogglePause(){Paused=!Paused;if(Paused)SetMode(ToolMode.Normal);}
     public void SetMode(ToolMode mode){Mode=mode;if(mode==ToolMode.Normal)cursor.Hide();}
     int TimerInterval()=>Math.Clamp((int)Math.Round(1000d/Math.Max(1,Settings.FramesPerSecond)),1,50);
-    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);}
-    void ReloadSettings(){Settings=Settings.Load();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
+    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);}
+    void ReloadSettings(){var s=Settings.Load();Sim.ChangeSkin(s.Skin);Settings=s;Sim.Settings=s;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();flySkinItem.Checked=s.Skin==PetSkin.Fly;roachSkinItem.Checked=s.Skin==PetSkin.Cockroach;if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
     bool OnMouseDown(Point p)
     {
         // Hook returns immediately. Work is deferred to the normal event loop; no synchronous rendering or I/O.
         if(!visible||Paused)return false;
         if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p))||(deathMenu?.Visible==true&&deathMenu.Bounds.Contains(p)))return false;
         if(tray.ContextMenuStrip?.Visible==true||!Area.Contains(p))return false;
-        if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Settings.PetSize*.55f+18)
+        if(Vector2.Distance(new Vector2(p.X,p.Y),Sim.Position)<=Sim.DisplaySize*.55f+18)
         {pendingClick=p;pendingMode=ToolMode.Swatter;return true;}
         if(Mode==ToolMode.Sugar){pendingClick=p;pendingMode=ToolMode.Sugar;return true;}
         return false;
@@ -175,15 +198,15 @@ public sealed class PetApplication : ApplicationContext
         if(now-statsPrevious>=1)
         {
             double duration=now-statsPrevious;MeasuredFps=frameCounter/duration;RealTimeRatio=simulatedWindow/duration;frameCounter=0;simulatedWindow=0;statsPrevious=now;
-            evidenceWindow?.RefreshEvidence();tray.Text=$"生命{Sim.Health:0}% 饱腹{Sim.Fullness:0}% · {(Settings.Invincible?"无敌":Sim.Behavior)}";
-            if(Sim.ConsumeAlbinoAnnouncement())tray.ShowBalloonTip(6500,"FlyPet","出金了！是白眼果蝇！",ToolTipIcon.Info);
+            evidenceWindow?.RefreshEvidence();tray.Text=$"{(Settings.Skin==PetSkin.Cockroach?"双马尾":"果蝇")} 生命{Sim.Health/Sim.MaxHealth*100:0}% 饱腹{Sim.Fullness:0}% · {(Settings.Invincible?"无敌":BehaviorLabel)}";
+            if(Sim.ConsumeAlbinoAnnouncement())tray.ShowBalloonTip(6500,"FlyPet",Settings.Skin==PetSkin.Cockroach?"出金了！放大版美洲大蠊登场！":"出金了！是白眼果蝇！",ToolTipIcon.Info);
             if(now>=nextStatusSave){nextStatusSave=now+5;SaveStatus();}
         }
         UpdateDeathMenu(Control.MousePosition);
     }
     void Draw()
     {
-        int size=Settings.PetSize;
+        int size=Sim.DisplaySize;
         while(sugarWindows.Count<Sim.Sugars.Count){var w=new LayerWindow(48,"FlyPet · 糖粒");sugarWindows.Add(w);}
         while(sugarWindows.Count>Sim.Sugars.Count){sugarWindows[^1].Dispose();sugarWindows.RemoveAt(sugarWindows.Count-1);}
         for(int i=0;i<Sim.Sugars.Count;i++)
@@ -199,6 +222,15 @@ public sealed class PetApplication : ApplicationContext
             bool uiOpen=tray.ContextMenuStrip?.Visible==true||dashboard.Visible||settingsWindow?.Visible==true||evidenceWindow?.Visible==true||brainMap?.Visible==true||deathMenu?.Visible==true;
             if(!uiOpen)pet.BringToFront();
         }
+        if(Settings.Skin==PetSkin.Cockroach&&!Sim.Dead&&Sim.SpeechRemaining>0)
+        {
+            if(!speech.Visible)speech.Show();
+            int x=Math.Clamp((int)Sim.Position.X+size/4,Area.Left+4,Math.Max(Area.Left+4,Area.Right-344));
+            int y=Math.Clamp((int)Sim.Position.Y-size/2-64,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-62));
+            speech.Render(x,y,340,58,FlyRenderer.DrawSpeechBubble);
+            speech.BringToFront();
+        }
+        else speech.Hide();
         if(Mode!=ToolMode.Normal)
         {
             var mouse=Control.MousePosition;if(!cursor.Visible)cursor.Show();
@@ -215,19 +247,20 @@ public sealed class PetApplication : ApplicationContext
     }
     void UpdateDeathMenu(Point mouse)
     {
-        bool overCorpse=visible&&Sim.Dead&&Sim.RemainsVisible&&Area.Contains(mouse)&&Vector2.Distance(new(mouse.X,mouse.Y),Sim.Position)<Settings.PetSize*.82f+58;
-        if(deathMenu==null&&overCorpse)deathMenu=new DeathMenuWindow(()=>{Sim.Revive(Area);StartPet();},()=>{Sim.CleanRemains();});
+        float remainsRadius=Settings.Skin==PetSkin.Cockroach?Math.Max(36,Sim.DisplaySize*.35f):Sim.DisplaySize*.82f+58;
+        bool overCorpse=visible&&Sim.Dead&&Sim.RemainsVisible&&Area.Contains(mouse)&&Vector2.Distance(new(mouse.X,mouse.Y),Sim.Position)<remainsRadius;
+        if(deathMenu==null&&overCorpse){deathMenu=new DeathMenuWindow(()=>{Sim.Revive(Area);StartPet();},()=>{Sim.CleanRemains();});deathMenu.SetSkin(Settings.Skin);}
         if(deathMenu==null)return;
         if(overCorpse||deathMenu.Bounds.Contains(mouse))deathMenu.ShowAt(Area,new((int)Sim.Position.X,(int)Sim.Position.Y));else deathMenu.Hide();
     }
     void SaveStatus()
     {
-        try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,escapeUrgency=Sim.EscapeUrgency,escapeDistanceRate=Sim.EscapeDistanceRate,rapidEscapeTurn=Sim.RapidEscapeTurn,feeding=Sim.Brain.Feeding,olfactory=Sim.Brain.OlfactoryRate,memory=Sim.Brain.MemoryConfidence,avoidanceMemory=Sim.Brain.AvoidanceConfidence,reward=Sim.Brain.RewardSignal,edgeCollisions=Sim.EdgeCollisions},Settings.JsonOptions));}catch(IOException){}
+        try{var path=Path.Combine(Settings.Folder,"status.json");File.WriteAllText(path,JsonSerializer.Serialize(new{timestamp=DateTimeOffset.Now,visible,Paused,mode=Mode.ToString(),skin=Settings.Skin.ToString(),size=Sim.DisplaySize,rare=Sim.Albino,behavior=Sim.Behavior,health=Sim.Health,fullness=Sim.Fullness,invincible=Settings.Invincible,grounded=Sim.Grounded,dead=Sim.Dead,deathCause=Sim.CauseOfDeath.ToString(),cockroachFlying=Sim.CockroachFlying,respawn=Sim.DeathRemaining,sugar=Sim.Sugars.Count,position=new{Sim.Position.X,Sim.Position.Y},fps=MeasuredFps,realtime=RealTimeRatio,computeMs=ComputeMs,neurons=Sim.Brain.NeuronCount,edges=Sim.Brain.EdgeCount,spikes=Sim.Brain.TotalSpikes,flight=Sim.Brain.Flight,fear=Sim.Brain.Fear,escapeUrgency=Sim.EscapeUrgency,escapeDistanceRate=Sim.EscapeDistanceRate,rapidEscapeTurn=Sim.RapidEscapeTurn,feeding=Sim.Brain.Feeding,olfactory=Sim.Brain.OlfactoryRate,memory=Sim.Brain.MemoryConfidence,avoidanceMemory=Sim.Brain.AvoidanceConfidence,reward=Sim.Brain.RewardSignal,edgeCollisions=Sim.EdgeCollisions},Settings.JsonOptions));}catch(IOException){}
     }
     protected override void ExitThreadCore()
     {
         if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
-        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
+        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
 

@@ -1,16 +1,20 @@
-# FlyPet · 果蝇桌宠
+# FlyPet · 果蝇 / 广东双马尾桌宠
 
-Windows 10/11 x64 果蝇桌宠。使用 .NET 8 SDK 运行 `./build.ps1` 后，双击 `dist/FlyPet.exe` 即可使用；生成的便携 EXE 自带 .NET 运行时，正常运行无需 Python、联网或 GPU。
+Windows 10/11 x64 桌宠。可在果蝇与“广东双马尾”（美洲大蠊外观）之间切换。使用 .NET 8 SDK 运行 `./build.ps1` 后，双击 `dist/FlyPet.exe` 即可使用；生成的便携 EXE 自带 .NET 运行时，正常运行无需 Python、联网或 GPU。
 
-![FlyPet 外观与动作](test-results-final/appearance.png)
+![蟑螂皮肤的奔跑与飞行动画](Assets/cockroach-preview.png)
 
-程序启动后直接放飞苍蝇，不再弹出启动控制中心。需要控制中心时，在右下角托盘图标右键选择“启动菜单”；设置窗口也从托盘进入。托盘菜单还包括投放糖、显示状态条、无敌模式、立即复活、大脑活动图、隐藏和退出。没有左下角控制栏，也没有苍蝇拍切换模式。苍蝇一直把靠近的鼠标当作威胁并躲避；普通桌面点击穿透，直接点到苍蝇时才会击中它。逃逸采用距离闭环：距离误差、持续时间和距离变化率共同形成逃逸紧迫度；无法拉开距离会继续加速并触发短促急转，稳定超过安全半径后才解除。托盘图标悬停文字显示生命与饱腹百分比。
+托盘的“切换外观”、小窝和设置窗口都可换皮肤。果蝇默认 90 px，普通广东双马尾默认 120 px；每次出生有 1/10 概率成为放大版，默认 500 px，概率与两种尺寸都可调。蟑螂低速时奔跑，冲刺时抬起外壳并拍动内翅，减速后落地；偶尔会说“Ciallo～(∠・ω< )⌒★”。神经、糖和逃逸规则沿用果蝇逻辑。
 
-生命降到零后，苍蝇会变成自己绘制的低多边形血污泥与断翅，随机等待 12–40 秒复活；托盘的“立即复活”跳过等待。无敌模式下拍打仍会让它短暂警觉、加速逃跑，但不扣血。被击中后的较小速度增益持续到下一次复活。飞行消耗额外饱腹值；达到饱腹阈值后会逐渐回血。糖需要持续接触并由进食回路保持激活一段时间才会吃完。饱腹度、糖、威胁和休息共同影响感觉输入及飞行欲望。屏幕边缘进入视觉运动回路；真实撞到边界时会物理反弹、不掉血，并产生负面奖励以降低该位置的记忆价值。它会短暂停歇，振翅停止。绘制目标 90 FPS，可在 20–120 FPS 间调整。
+![广东双马尾的奔跑与飞行](Assets/cockroach-preview.png)
 
-外观是自己生成的低多边形 3D 几何与低分辨率贴图效果，采用固定俯视视角、深度排序、动态翅膀和接触阴影。没有使用 Buckshot Roulette 的原始资源。当前默认大小为 90 像素、基础速度为 400 像素/秒；设置中可以继续调高。
+程序启动后直接放出桌宠。需要控制中心时，在右下角托盘图标右键选择“打开小窝”；设置窗口也从托盘进入。托盘顶层保留投糖、换外观、暂停和退出；状态条、无敌、立即复活、大脑图等收在“更多操作”。没有左下角控制栏，也没有苍蝇拍切换模式。桌宠一直把靠近的鼠标当作威胁并躲避；普通桌面点击穿透，直接点到桌宠时才会击中它。逃逸采用距离闭环：距离误差、持续时间和距离变化率共同形成逃逸紧迫度；无法拉开距离会继续加速并触发短促急转，稳定超过安全半径后才解除。托盘图标悬停文字显示生命与饱腹百分比。
 
-苍蝇死亡后，鼠标悬停在泥状残骸上会出现暗色复古选项框：“复活吧我的爱人”和“清理”。白眼果蝇会在初次加载或复活时按概率出现，具有浅色身体、白眼、更高生命和更快速度；出现时托盘会弹出“出金了！是白眼果蝇！”。
+死亡后默认随机等待 45–90 秒复活，等待时间可在“生存”栏目调整；托盘的“立即复活”可跳过等待。果蝇被拍死留下泥状残骸，饿死则翻身；广东双马尾留下小白卵。默认饱腹下降与活动消耗已放慢，饱腹归零后从满血到饿死约需 20 分钟。无敌模式下拍打仍会让它短暂警觉、加速逃跑，但不扣血。糖需要持续接触并由进食回路保持激活一段时间才会吃完。屏幕边缘进入视觉运动回路；真实撞到边界时会物理反弹、不掉血，并产生负面奖励。绘制目标 90 FPS，可在 20–120 FPS 间调整。
+
+两套外观都由程序内的低多边形 3D 几何绘制，采用固定俯视视角、深度排序、动态翅膀和接触阴影。没有使用 Buckshot Roulette 的原始资源。果蝇默认 90 像素，蟑螂默认 120 像素，基础速度为 400 像素/秒；设置中可以继续调高。
+
+桌宠死亡后，鼠标悬停在残骸或小白卵上会出现复活与清理选项。果蝇模式的白眼个体与蟑螂模式的巨型个体分别默认以 1/10 概率出现；稀有个体沿用原有较高生命与速度倍率，出现时托盘会提示。
 
 ## 大脑与真实性
 
@@ -38,8 +42,8 @@ python .\tools\verify_source.py --hash-weights
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。“恢复默认”会一次恢复、保存并立即应用全部默认参数，其中苍蝇大小为 90、白眼果蝇概率为 0.10。主要自定义项包括 `FramesPerSecond`（默认 90）、`PetSize`（默认 90，允许 60–800）、`FlightSpeed`（默认 400）、`FearRadius`、`EscapeSafeRadiusMultiplier`（默认 1.35）、`EscapeAccelerationGain`（默认 1.4）、`HungerPerMinute`（默认 0.8）、`FlightFullnessCostPerSecond`（默认 0.008）、`SugarEatingSeconds`（默认 1.8 秒）、`SatiatedThreshold`（默认 85）、`SatiatedRegenPerSecond`（默认每秒 1.5）、`AlarmSeconds`、`AlbinoChance`（默认 0.1）、`AlbinoSpeedMultiplier`、`NeuralGain`、`SensoryGain`、`EdgeSensing`、`NeuralSteering`、`RestEnabled`、`Invincible`、`ShowMeters`（默认关闭）、复活时间、糖的感知距离以及显示器索引。默认从 65 饱腹出生，即使按持续飞行的上限估算也能活约一小时；登录 Windows 自动启动可在设置中开启，默认关闭。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可调大小，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类，当前栏目会高亮。外观包括两种皮肤、尺寸和稀有概率；生存包括饱腹消耗、饥饿失血与复活时间。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
-现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
+现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command skin cockroach`、`--command skin fly`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 
 重新编译：安装 .NET 8 SDK，在 `FlyPet/` 运行 `./build.ps1`，会生成独立便携的 `dist/FlyPet.exe`。若需重新从原始缓存提取回路，先运行 `..\FlyBrain\.venv\Scripts\python.exe tools\extract_circuit.py`。`dotnet bin/Release/net8.0-windows/FlyPet.dll --self-test test-results` 可做逻辑、学习、碰撞、外观和纯计算性能检查。当前本机 Release 自测覆盖神经飞行、逃逸转向、渐进进食、饱腹回血、边缘负面记忆和新个体记忆清空；纯模拟与几何绘制性能也纳入检查。这是计算基准，不等同于 Windows 桌面实际 FPS。运行时 `status.json` 提供实测 FPS、嗅觉、奖励、记忆置信和碰撞次数。每次只在选定显示器工作区域内生活；安全桌面、锁屏与独占全屏不保证置顶。错误日志在 `%LOCALAPPDATA%\FlyPet\error.log`。
