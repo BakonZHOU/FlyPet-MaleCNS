@@ -1,7 +1,7 @@
 name: Build and self-test
 
 env:
-  RELEASE_VERSION: 1.1.1
+  RELEASE_VERSION: 1.1.2
 
 on:
   push:

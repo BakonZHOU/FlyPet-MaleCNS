@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"; VERSION="${VERSION:-1.1.1}"; ARCHS="${ARCHS:-arm64 x86_64}"; BUILD="$ROOT/.build/macos"; RELEASE="$ROOT/releases/latest"; WINDOWS="$ROOT/windows"; APP="$BUILD/FlyPet.app"; CONTENTS="$APP/Contents"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"; VERSION="${VERSION:-1.1.2}"; ARCHS="${ARCHS:-arm64 x86_64}"; BUILD="$ROOT/.build/macos"; RELEASE="$ROOT/releases/latest"; WINDOWS="$ROOT/windows"; APP="$BUILD/FlyPet.app"; CONTENTS="$APP/Contents"
 rm -rf "$BUILD"; mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$BUILD/bin" "$BUILD/dmg" "$RELEASE"
 cp "$ROOT/macos/Info.plist" "$CONTENTS/Info.plist"; cp "$ROOT/README.md" "$CONTENTS/Resources/使用说明.md"; cp "$WINDOWS/THIRD_PARTY.md" "$CONTENTS/Resources/THIRD_PARTY.md"; cp "$WINDOWS/Assets/circuit.json" "$CONTENTS/Resources/circuit.json"
 swift "$ROOT/macos/make_icon.swift" "$BUILD/FlyPet.iconset"; iconutil -c icns "$BUILD/FlyPet.iconset" -o "$CONTENTS/Resources/FlyPet.icns"
@@ -13,5 +13,10 @@ done
 if [ "${#bins[@]}" -eq 1 ]; then cp "${bins[0]}" "$CONTENTS/MacOS/FlyPet"; else lipo -create "${bins[@]}" -output "$CONTENTS/MacOS/FlyPet"; fi
 chmod +x "$CONTENTS/MacOS/FlyPet"; codesign --force --deep --sign - "$APP"
 cp -R "$APP" "$BUILD/dmg/FlyPet.app"; ln -s /Applications "$BUILD/dmg/Applications"
-ARCH_LABEL="$(echo "$ARCHS" | tr ' ' '-')"; DMG="$RELEASE/FlyPet-${VERSION}-macOS-${ARCH_LABEL}.dmg"; rm -f "$DMG"; hdiutil create -volname FlyPet -srcfolder "$BUILD/dmg" -ov -format UDZO "$DMG"
+ARCH_LABEL="$(echo "$ARCHS" | tr ' ' '-')"; DMG="$RELEASE/FlyPet-${VERSION}-macOS-${ARCH_LABEL}.dmg"; rm -f "$DMG"
+# The Universal 2 app carries two self-contained runtimes.  hdiutil's inferred
+# capacity can under-size this image on hosted Apple-Silicon runners, so reserve
+# a small explicit margin before compression.
+image_size_mb=$(( $(du -sm "$BUILD/dmg" | awk '{print $1}') + 128 ))
+hdiutil create -volname FlyPet -srcfolder "$BUILD/dmg" -size "${image_size_mb}m" -ov -format UDZO "$DMG"
 file "$CONTENTS/MacOS/FlyPet"; codesign --verify --deep --strict "$APP"; echo "Created $DMG"
