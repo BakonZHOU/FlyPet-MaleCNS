@@ -13,11 +13,11 @@ import pandas as pd
 import pyarrow.feather as feather
 from scipy.sparse import load_npz
 
-root = Path(__file__).resolve().parents[2]
+root = Path(__file__).resolve().parents[3]
 parser = argparse.ArgumentParser()
 parser.add_argument('--hash-weights', action='store_true', help='SHA-256 all 1.1 GB of original weight data')
 args = parser.parse_args()
-asset = json.loads((root / 'FlyPet/Assets/circuit.json').read_text(encoding='utf-8'))
+asset = json.loads((root / 'FlyPet/windows/Assets/circuit.json').read_text(encoding='utf-8'))
 manifest = json.loads((root / 'FlyBrain/flybrain/data/manifest.json').read_text(encoding='utf-8'))
 official = {item['path']: item for item in manifest['malecns']['files']}
 

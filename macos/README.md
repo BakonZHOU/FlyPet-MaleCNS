@@ -8,4 +8,4 @@
 ./package.sh macos-universal
 ```
 
-输出位于 `dist/`。GitHub Actions 同时生成 Apple Silicon、Intel 和 Universal 2 三种 DMG。当前公开构建使用 ad-hoc 签名，尚未使用付费 Apple Developer ID 公证；若 Gatekeeper 阻止首次运行，请在 Finder 中右键应用并选择“打开”。
+输出位于 `releases/latest/`，该目录只保留当前版本的安装包。GitHub Actions 同时生成 Apple Silicon、Intel 和 Universal 2 三种 DMG。当前公开构建使用 ad-hoc 签名，尚未使用付费 Apple Developer ID 公证；若 Gatekeeper 阻止首次运行，请在 Finder 中右键应用并选择“打开”。

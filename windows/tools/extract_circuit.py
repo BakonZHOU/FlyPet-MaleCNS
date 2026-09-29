@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.sparse import load_npz
 
-root = Path(__file__).resolve().parents[2]
+root = Path(__file__).resolve().parents[3]
 parser = argparse.ArgumentParser()
 parser.add_argument('--max-neurons', type=int, default=16711)
 args = parser.parse_args()
@@ -79,7 +79,7 @@ result = {'source': 'MaleCNS v1.0 via local FlyBrain compiled cache',
           'notes': 'Cached signs include FlyBrain NT assumptions. No receptor correction. Runtime weights are capped and normalized; sensory drives, plastic place coding and decoder are engineered biological hypotheses, not validated whole-animal physiology.',
           'cacheSha256': hashlib.sha256((root/'FlyBrain/cache/neurons.parquet').read_bytes()).hexdigest(),
           'nodes': nodes, 'edges': edges}
-out = root / 'FlyPet/Assets/circuit.json'
+out = root / 'FlyPet/windows/Assets/circuit.json'
 out.parent.mkdir(parents=True, exist_ok=True)
 out.write_text(json.dumps(result, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
 print(json.dumps({'neurons':len(nodes), 'edges':len(edges), 'groups':{k:int(v.sum()) for k,v in groups.items()}, 'bytes':out.stat().st_size}))

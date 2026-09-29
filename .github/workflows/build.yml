@@ -19,22 +19,21 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - name: Build
-        run: dotnet build FlyPet.csproj -c Release
+        run: dotnet build windows/FlyPet.csproj -c Release
       - name: Run simulation self-tests
         shell: pwsh
         run: |
-          dotnet .\bin\Release\net8.0-windows\FlyPet.dll --self-test .\test-results-ci
+          dotnet .\windows\bin\Release\net8.0-windows\FlyPet.dll --self-test .\test-results-ci
           $result = Get-Content .\test-results-ci\results.json -Raw | ConvertFrom-Json
           if (-not $result.passed) { throw "$($result.failures) self-test(s) failed" }
       - name: Package Windows x64
         shell: pwsh
         run: |
-          ./package.ps1 windows-x64
-          Compress-Archive -Path .\dist\windows-x64\* -DestinationPath .\dist\FlyPet-${{ env.RELEASE_VERSION }}-windows-x64.zip
+          ./package.ps1 windows-x64 -Version ${{ env.RELEASE_VERSION }}
       - uses: actions/upload-artifact@v4
         with:
           name: FlyPet-windows-x64
-          path: dist/FlyPet-*-windows-x64.zip
+          path: releases/latest/FlyPet-*-windows-x64.zip
           if-no-files-found: error
 
   macos:
@@ -56,13 +55,13 @@ jobs:
         run: ./macos/build.sh
       - name: Verify bundle
         run: |
-          file build/macos/FlyPet.app/Contents/MacOS/FlyPet
-          codesign --verify --deep --strict build/macos/FlyPet.app
-          test -f build/macos/FlyPet.app/Contents/Resources/FlyPet.icns
+          file .build/macos/FlyPet.app/Contents/MacOS/FlyPet
+          codesign --verify --deep --strict .build/macos/FlyPet.app
+          test -f .build/macos/FlyPet.app/Contents/Resources/FlyPet.icns
       - uses: actions/upload-artifact@v4
         with:
           name: FlyPet-macOS-${{ matrix.label }}
-          path: dist/*.dmg
+          path: releases/latest/*.dmg
           if-no-files-found: error
 
   release:

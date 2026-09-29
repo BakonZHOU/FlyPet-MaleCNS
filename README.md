@@ -22,22 +22,22 @@ macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按
 - 果蝇与广东双马尾两套动态外观，包含稀有个体和可调尺寸。
 - Windows 版提供大脑活动图、神经连接证据和本地命令控制。
 
-![蟑螂皮肤的奔跑与飞行动画](Assets/cockroach-preview.png)
+![蟑螂皮肤的奔跑与飞行动画](windows/Assets/cockroach-preview.png)
 
 ## 开源代码结构
 
 | 目录/文件 | 内容 |
 | --- | --- |
-| `Simulation.cs`、`Brain.cs` | 身体行为、学习与神经回路计算 |
-| `FlyRenderer.cs`、`Interface.cs` | Windows 桌宠渲染与控制界面 |
+| `windows/` | Windows 桌宠、神经回路、资源和 PowerShell 打包脚本 |
 | `macos/` | macOS 原生 AppKit 前端、图标和 DMG 打包脚本 |
-| `Assets/circuit.json` | 内置的 MaleCNS 回路数据 |
-| `tools/` | 回路提取、来源核对与冒烟测试脚本 |
+| `releases/latest/` | 本地当前版本的 ZIP/DMG 安装包；不放编译缓存或源码 |
+| `windows/Assets/circuit.json` | 内置的 MaleCNS 回路数据 |
+| `windows/tools/` | 回路提取、来源核对与冒烟测试脚本 |
 | `.github/workflows/build.yml` | Windows/macOS 自动构建、架构验证和标签发布 |
 
 ## 本地打包
 
-Windows：`./package.ps1 windows-x64`（也支持 `windows-arm64`）。macOS：`./package.sh macos-arm64`、`./package.sh macos-x64` 或 `./package.sh macos-universal`。所有产物均写入 `dist/`；完整的 Mac 构建说明见 [macOS 说明](macos/README.md)。
+Windows：`./package.ps1 windows-x64`（也支持 `windows-arm64`）。macOS：`./package.sh macos-arm64`、`./package.sh macos-x64` 或 `./package.sh macos-universal`。所有安装包均写入 `releases/latest/`，临时编译文件统一写入 `.build/`；完整的 Mac 构建说明见 [macOS 说明](macos/README.md)。
 
 ## 大脑与真实性
 
@@ -53,19 +53,19 @@ Windows：`./package.ps1 windows-x64`（也支持 `windows-arm64`）。macOS：`
 
 ## 自己核对数据，而不是相信测试报告
 
-`tools/verify_source.py` 独立于提取器和模拟器。它先把本机原始胞体注释文件算出 SHA-256，与 `FlyBrain/flybrain/data/manifest.json` 中官方下载文件记录比较；再核对全部 16,711 个 bodyId、类型、侧别、胞体坐标和全部 2,075,126 条有符号连接，与本机 `FlyBrain/cache` 中的编译矩阵逐一比较。加 `--hash-weights` 还会计算约 1.1 GB 原始连接权重文件 SHA-256，便于和[官方来源](https://male-cns.janelia.org/download/)比对。
+`windows/tools/verify_source.py` 独立于提取器和模拟器。它先把本机原始胞体注释文件算出 SHA-256，与 `FlyBrain/flybrain/data/manifest.json` 中官方下载文件记录比较；再核对全部 16,711 个 bodyId、类型、侧别、胞体坐标和全部 2,075,126 条有符号连接，与本机 `FlyBrain/cache` 中的编译矩阵逐一比较。加 `--hash-weights` 还会计算约 1.1 GB 原始连接权重文件 SHA-256，便于和[官方来源](https://male-cns.janelia.org/download/)比对。
 
 独立来源核对需要把本项目放在已下载 MaleCNS/FlyBrain 原始缓存的工作区旁，再运行：
 
 ```powershell
-python .\tools\verify_source.py --hash-weights
+python .\windows\tools\verify_source.py --hash-weights
 ```
 
-也可直接打开 `FlyPet/Assets/circuit.json` 查任一节点 `bodyId` 和任一边 `[突触前索引, 突触后索引, 有符号计数]`，在活动图点同一节点看实时电压/放电率；阅读 `Brain.cs` 的 `SetInput`、`Step` 及 `Simulation.cs` 的 `Update` 可看到刺激如何变成神经活动再到动作。哈希、原始文件及独立脚本比本程序自己生成的测试 JSON 更容易复核，但仍不能验证生物学行为预测；那需要真实神经记录与损毁实验。
+也可直接打开 `windows/Assets/circuit.json` 查任一节点 `bodyId` 和任一边 `[突触前索引, 突触后索引, 有符号计数]`，在活动图点同一节点看实时电压/放电率；阅读 `windows/Brain.cs` 的 `SetInput`、`Step` 及 `windows/Simulation.cs` 的 `Update` 可看到刺激如何变成神经活动再到动作。哈希、原始文件及独立脚本比本程序自己生成的测试 JSON 更容易复核，但仍不能验证生物学行为预测；那需要真实神经记录与损毁实验。
 
 ## 设置与开发
 
-设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可调大小，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类，当前栏目会高亮。外观包括两种皮肤、尺寸和稀有概率；生存包括饱腹消耗、饥饿失血与复活时间。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。高级使用者可把符合 `Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
+设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可调大小，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类，当前栏目会高亮。外观包括两种皮肤、尺寸和稀有概率；生存包括饱腹消耗、饥饿失血与复活时间。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。高级使用者可把符合 `windows/Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command skin cockroach`、`--command skin fly`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 

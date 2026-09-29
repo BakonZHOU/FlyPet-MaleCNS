@@ -1,9 +1,13 @@
 # Run against a running FlyPet using its supported current-user local control API.
-param([switch]$IncludeExit)
+param(
+    [switch]$IncludeExit,
+    [string]$BuildDirectory = ''
+)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$exe = Join-Path $root 'dist/FlyPet.exe'
-$out = Join-Path $root 'test-results'
+if ([string]::IsNullOrWhiteSpace($BuildDirectory)) { $BuildDirectory = Join-Path (Split-Path $root -Parent) '.build/windows/windows-x64' }
+$exe = Join-Path $BuildDirectory 'FlyPet.exe'
+$out = Join-Path (Split-Path $root -Parent) '.build/smoke-test'
 New-Item -ItemType Directory -Path $out -Force | Out-Null
 $reply = Join-Path $out 'command-reply.json'
 $checks = [System.Collections.Generic.List[object]]::new()

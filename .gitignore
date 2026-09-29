@@ -1,7 +1,8 @@
 bin/
 obj/
 dist/
-build/
+.build/
+releases/latest/*
 test-results/
 test-results-tuned*/
 test-results-cursor*/
