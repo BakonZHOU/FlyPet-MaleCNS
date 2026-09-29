@@ -23,3 +23,46 @@ jobs:
           $result = Get-Content .\test-results-ci\results.json -Raw | ConvertFrom-Json
           if (-not $result.passed) { throw "$($result.failures) self-test(s) failed" }
 
+  macos:
+    name: macOS ${{ matrix.label }}
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: Apple-Silicon, archs: arm64 }
+          - { label: Intel, archs: x86_64 }
+          - { label: Universal-2, archs: "arm64 x86_64" }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app and DMG
+        env:
+          ARCHS: ${{ matrix.archs }}
+        run: ./macos/build.sh
+      - name: Verify bundle
+        run: |
+          file build/macos/FlyPet.app/Contents/MacOS/FlyPet
+          codesign --verify --deep --strict build/macos/FlyPet.app
+          test -f build/macos/FlyPet.app/Contents/Resources/FlyPet.icns
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlyPet-macOS-${{ matrix.label }}
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: FlyPet-macOS-*
+          merge-multiple: true
+          path: release
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.dmg
+

@@ -1,3 +1,7 @@
 Assets/circuit.json -diff
 *.png binary
+*.sh text eol=lf
+*.swift text eol=lf
+*.plist text eol=lf
+*.yml text eol=lf
 

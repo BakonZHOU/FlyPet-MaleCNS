@@ -1,5 +1,9 @@
 # FlyPet · 果蝇 / 广东双马尾桌宠
 
+支持 Windows 10/11 x64 与 macOS 13+。macOS 提供 Apple Silicon (`arm64`)、Intel (`x86_64`) 和 Universal 2 三种 DMG；菜单栏使用会自动适应明暗主题的小图标，应用本体带完整 `.icns` 图标。下载与构建方法见 [macOS 说明](macos/README.md)。
+
+统一打包入口：Windows 运行 `./package.ps1 windows-x64`（也支持 `windows-arm64`）；macOS 运行 `./package.sh macos-arm64`、`macos-x64` 或 `macos-universal`。各入口均输出到 `dist/`，便于之后重复发布不同架构。
+
 Windows 10/11 x64 桌宠。可在果蝇与“广东双马尾”（美洲大蠊外观）之间切换。使用 .NET 8 SDK 运行 `./build.ps1` 后，双击 `dist/FlyPet.exe` 即可使用；生成的便携 EXE 自带 .NET 运行时，正常运行无需 Python、联网或 GPU。
 
 ![蟑螂皮肤的奔跑与飞行动画](Assets/cockroach-preview.png)
