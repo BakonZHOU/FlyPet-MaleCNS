@@ -1,5 +1,8 @@
 name: Build and self-test
 
+env:
+  RELEASE_VERSION: 1.1.0
+
 on:
   push:
     branches: [main]
@@ -22,6 +25,16 @@ jobs:
           dotnet .\bin\Release\net8.0-windows\FlyPet.dll --self-test .\test-results-ci
           $result = Get-Content .\test-results-ci\results.json -Raw | ConvertFrom-Json
           if (-not $result.passed) { throw "$($result.failures) self-test(s) failed" }
+      - name: Package Windows x64
+        shell: pwsh
+        run: |
+          ./package.ps1 windows-x64
+          Compress-Archive -Path .\dist\windows-x64\* -DestinationPath .\dist\FlyPet-${{ env.RELEASE_VERSION }}-windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FlyPet-windows-x64
+          path: dist/FlyPet-*-windows-x64.zip
+          if-no-files-found: error
 
   macos:
     name: macOS ${{ matrix.label }}
@@ -38,6 +51,7 @@ jobs:
       - name: Build app and DMG
         env:
           ARCHS: ${{ matrix.archs }}
+          VERSION: ${{ env.RELEASE_VERSION }}
         run: ./macos/build.sh
       - name: Verify bundle
         run: |
@@ -62,7 +76,26 @@ jobs:
           pattern: FlyPet-macOS-*
           merge-multiple: true
           path: release
+      - uses: actions/download-artifact@v4
+        with:
+          name: FlyPet-windows-x64
+          path: release
       - uses: softprops/action-gh-release@v2
         with:
-          files: release/*.dmg
+          files: |
+            release/*.dmg
+            release/*.zip
+          body: |
+            ## 下载
+
+            | 设备 | 文件 |
+            | --- | --- |
+            | Windows 10/11（Intel/AMD） | `FlyPet-${{ env.RELEASE_VERSION }}-windows-x64.zip` |
+            | Mac（M 系列芯片） | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-arm64.dmg` |
+            | Intel Mac | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-x86_64.dmg` |
+            | 不确定 Mac 芯片 | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-arm64-x86_64.dmg` |
+
+            Windows 解压后双击 `FlyPet.exe`。Mac 打开 DMG 后将应用拖入“应用程序”。
+
+            macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按应用，再选择“打开”。
 
