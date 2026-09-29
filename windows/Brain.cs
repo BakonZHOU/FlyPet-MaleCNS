@@ -81,6 +81,7 @@ public sealed class Brain
     public float AvoidanceVectorX { get; private set; }
     public float AvoidanceVectorY { get; private set; }
     public float LocalAvoidanceConfidence { get; private set; }
+    public float AvoidanceSkill { get; private set; }
     public float RewardSignal { get; private set; }
     public float WallDrive { get; private set; }
     public float ThreatDrive { get; private set; }
@@ -128,10 +129,11 @@ public sealed class Brain
     public void Reset(){Array.Fill(voltage,-52);Array.Clear(current);Array.Clear(rates);Array.Clear(drive);Array.Clear(adaptation);foreach(var d in delayed)Array.Clear(d);Array.Clear(refractory);delaySlot=0;Flight=Fear=Feeding=Turn=OdorTurn=NavigationTurn=DescendingTurn=RewardSignal=0;}
     public void SetInput(float threat,float contact,float fullness,float turn,float travel,float wall,Settings s,
         float odor=0,float odorTurn=0,float wallTurn=0,float positionX=.5f,float positionY=.5f,float reward=0,float punishment=0,float frameDt=1f/120,
-        float avoidanceRadiusX=.12f,float avoidanceRadiusY=.12f,bool learnPunishment=true)
+        float avoidanceRadiusX=.12f,float avoidanceRadiusY=.12f,bool learnPunishment=true,float avoidanceReward=0)
     {
         Array.Clear(drive);
         void Add(int[] ids,float v){foreach(int i in ids)drive[i]+=v*s.SensoryGain;}
+        UpdateLocalAvoidance(positionX,positionY,avoidanceRadiusX,avoidanceRadiusY);
         ThreatDrive=threat;WallDrive=wall;FoodDrive=travel;
         odorDirectionInput=Math.Clamp(odorTurn,-1,1);wallDirectionInput=Math.Clamp(wallTurn,-1,1);
         // External drives replace missing retina/olfaction/proprioception. Most enter sensory populations;
@@ -146,12 +148,13 @@ public sealed class Brain
         // A sparse navigation population receives the decoded edge/place-memory direction.
         // Its bilateral firing, rather than this input value, is used for most of the body turn.
         float navigationDrive=Math.Clamp(Math.Max(wall,LocalAvoidanceConfidence),0,1),navigationInput=wall>.05f?wallTurn:turn;
-        Add(navigationStimLeft,Math.Max(0,-navigationInput)*navigationDrive*12);Add(navigationStimRight,Math.Max(0,navigationInput)*navigationDrive*12);
+        float learnedNavigationGain=1+LocalAvoidanceConfidence*(.8f+AvoidanceSkill*1.8f);
+        Add(navigationStimLeft,Math.Max(0,-navigationInput)*navigationDrive*12*learnedNavigationGain);Add(navigationStimRight,Math.Max(0,navigationInput)*navigationDrive*12*learnedNavigationGain);
         Add(groups["taste"],contact*14);
-        Add(rewardStim,Math.Clamp(Math.Abs(reward-punishment)*20,0,24));
+        Add(rewardStim,Math.Clamp((Math.Abs(reward-punishment)+avoidanceReward*.65f)*20,0,24));
         float decay=MathF.Exp(-Math.Max(0,s.MemoryDecayPerMinute)/60*frameDt);
         float valence=Math.Clamp(reward*s.SugarReward-(learnPunishment?punishment*s.EdgePunishment:0),-1,1);
-        RewardSignal=Math.Clamp(reward*s.SugarReward-punishment*s.EdgePunishment,-1,1);
+        RewardSignal=Math.Clamp(reward*s.SugarReward-punishment*s.EdgePunishment+avoidanceReward*.35f,-1,1);
         for(int k=0;k<placeCells.Length;k++)
         {
             float dx=positionX-placeX[k],dy=positionY-placeY[k];float activation=MathF.Exp(-(dx*dx+dy*dy)/.018f);placeActivity[k]=activation;
@@ -191,7 +194,12 @@ public sealed class Brain
         // while the matching sensory population is firing and graph propagation is on.
         OdorTurn=Math.Clamp(odorDirectionInput*odorGate,-1,1);
         float navigationLateral=(Mean(navigationRight)-Mean(navigationLeft))/18;
-        NavigationTurn=Math.Clamp(navigationLateral*.9f+wallDirectionInput*wallGate*.25f,-1,1);
+        float learnedPathwayGain=.30f+AvoidanceSkill*.70f;
+        float avoidanceFiringGate=Math.Clamp(VisualMotionRate/4+NavigationRate/6,0,1)*connected;
+        // The remembered inward direction is only expressed when visual-motion or
+        // navigation populations are actually firing. The graph's lateral bias is
+        // retained as exploration noise, but cannot reverse a learned danger turn.
+        NavigationTurn=Math.Clamp(navigationLateral*.08f*connected+wallDirectionInput*avoidanceFiringGate*learnedPathwayGain,-1,1);
         DescendingTurn=Math.Clamp((Mean(descendingRight)-Mean(descendingLeft))/50,-1,1);
         Flight=Math.Clamp(FlightRate/55+WingRate/14+MotorRate/80+DescendingRate/180,0,1);
         // These two escape neurons also have descending annotations and fire under broad visual drive.
@@ -239,16 +247,26 @@ public sealed class Brain
             float dx=(positionX-placeX[i])/radiusX,dy=(positionY-placeY[i])/radiusY,d2=dx*dx+dy*dy;
             if(d2<=1)placeValue[i]=Math.Clamp(placeValue[i]-strength*MathF.Exp(-1.35f*d2),-1,1);
         }
+        // Pairing place-cell activity with aversive DAN input strengthens the
+        // learned edge-to-navigation pathway. It changes future neural drive;
+        // it does not directly rotate or teleport the body.
+        AvoidanceSkill=Math.Clamp(AvoidanceSkill+(.25f+strength*.35f)*(1-AvoidanceSkill),0,1);
         UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY,radiusX,radiusY);
     }
+    public void ReinforceSuccessfulAvoidance(float strength)
+    {
+        strength=Math.Clamp(strength,0,1);
+        AvoidanceSkill=Math.Clamp(AvoidanceSkill+strength*.10f*(1-AvoidanceSkill),0,1);
+    }
+    public void SenseLocation(float positionX,float positionY,float radiusX,float radiusY)=>UpdateLocalAvoidance(positionX,positionY,radiusX,radiusY);
     public float[] ExportMemory()=>(float[])placeValue.Clone();
     public void ImportMemory(float[] values)
     {
-        int count=Math.Min(values.Length,placeValue.Length);for(int i=0;i<count;i++)placeValue[i]=float.IsFinite(values[i])?Math.Clamp(values[i],-1,1):0;UpdateRememberedPlace();
+        int count=Math.Min(values.Length,placeValue.Length);for(int i=0;i<count;i++)placeValue[i]=float.IsFinite(values[i])?Math.Clamp(values[i],-1,1):0;UpdateRememberedPlace();AvoidanceSkill=Math.Max(AvoidanceSkill,AvoidanceConfidence*.85f);
     }
     public void ClearMemory()
     {
-        Array.Clear(placeValue);Array.Clear(placeActivity);RememberedX=RememberedY=AvoidedX=AvoidedY=.5f;MemoryConfidence=AvoidanceConfidence=LocalAvoidanceConfidence=AvoidanceVectorX=AvoidanceVectorY=0;
+        Array.Clear(placeValue);Array.Clear(placeActivity);RememberedX=RememberedY=AvoidedX=AvoidedY=.5f;MemoryConfidence=AvoidanceConfidence=LocalAvoidanceConfidence=AvoidanceVectorX=AvoidanceVectorY=AvoidanceSkill=0;
     }
     float Mean(int[] ids){float sum=0;foreach(int i in ids)sum+=rates[i];return ids.Length==0?0:sum/ids.Length;}
 }

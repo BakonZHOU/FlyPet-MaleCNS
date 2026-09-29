@@ -38,11 +38,15 @@ public sealed class Simulation
     Vector2 wander;
     Sugar? feedingSugar;
     float feedingElapsed;
-    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown,edgeShock,rewardPulse,punishmentPulse;
+    float wanderRemaining,neuralRemainder,hitCooldown,flightDuration,burstRemaining,burstCooldown,edgeShock,rewardPulse,punishmentPulse,avoidanceRewardPulse;
     float escapeIntegral,previousMouseDistance=float.NaN,escapeSafeTime,rapidTurnRemaining,rapidTurnCooldown;
+    float avoidanceEpisodePeak,avoidanceSuccessRemaining;
     int rapidTurnSign;
-    bool escapeActive;
+    bool escapeActive,avoidanceEpisode;
     public int EdgeCollisions {get;private set;}
+    public int SuccessfulEdgeAvoidances {get;private set;}
+    public float PredictiveEdgeRisk {get;private set;}
+    public float LearnedEdgeRisk {get;private set;}
     public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);RollSkin();Health=MaxHealth;}
     public void Recenter(Rectangle area){Position=new(area.Left+area.Width*.55f,area.Top+area.Height*.45f);wander=Position;Velocity=Vector2.Zero;}
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
@@ -67,13 +71,13 @@ public sealed class Simulation
     public void CleanRemains(){if(Dead){RemainsVisible=false;DeathRemaining=0;Behavior="已清理";}}
     public void Revive(Rectangle area)
     {
-        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;CauseOfDeath=DeathCause.None;CockroachFlying=false;SpeechRemaining=0;speechDelay=5;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=edgeShock=rewardPulse=punishmentPulse=feedingElapsed=escapeIntegral=escapeSafeTime=rapidTurnRemaining=rapidTurnCooldown=EscapeUrgency=EscapeDistanceRate=0;previousMouseDistance=float.NaN;escapeActive=false;rapidTurnSign=0;feedingSugar=null;Brain.Reset();Brain.ClearMemory();Recenter(area);
+        RollSkin();Health=MaxHealth;Fullness=65;DeathRemaining=0;CauseOfDeath=DeathCause.None;CockroachFlying=false;SpeechRemaining=0;speechDelay=5;Alarm=InjuryArousal=RestRemaining=flightDuration=burstRemaining=burstCooldown=edgeShock=rewardPulse=punishmentPulse=avoidanceRewardPulse=avoidanceEpisodePeak=avoidanceSuccessRemaining=PredictiveEdgeRisk=LearnedEdgeRisk=feedingElapsed=escapeIntegral=escapeSafeTime=rapidTurnRemaining=rapidTurnCooldown=EscapeUrgency=EscapeDistanceRate=0;previousMouseDistance=float.NaN;escapeActive=avoidanceEpisode=false;rapidTurnSign=0;SuccessfulEdgeAvoidances=0;feedingSugar=null;Brain.Reset();Brain.ClearMemory();Recenter(area);
         Position+=new Vector2((float)(random.NextDouble()-.5)*area.Width*.4f,(float)(random.NextDouble()-.5)*area.Height*.4f);Behavior="复活";Grounded=false;
     }
     public void Update(float dt,Rectangle area,Vector2 mouse,bool cursorThreat)
     {
         Time+=dt;HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;rapidTurnRemaining=Math.Max(0,rapidTurnRemaining-dt);rapidTurnCooldown=Math.Max(0,rapidTurnCooldown-dt);
-        edgeShock=Math.Max(0,edgeShock-dt*2.5f);rewardPulse=Math.Max(0,rewardPulse-dt*.7f);punishmentPulse=Math.Max(0,punishmentPulse-dt*1.2f);
+        edgeShock=Math.Max(0,edgeShock-dt*2.5f);rewardPulse=Math.Max(0,rewardPulse-dt*.7f);punishmentPulse=Math.Max(0,punishmentPulse-dt*1.2f);avoidanceRewardPulse=Math.Max(0,avoidanceRewardPulse-dt*2.2f);avoidanceSuccessRemaining=Math.Max(0,avoidanceSuccessRemaining-dt);
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         if(Settings.Skin==PetSkin.Cockroach)
         {
@@ -126,6 +130,10 @@ public sealed class Simulation
             wander=new(area.Left+margin+(float)random.NextDouble()*Math.Max(1,area.Width-2*margin),area.Top+margin+(float)random.NextDouble()*Math.Max(1,area.Height-2*margin));
             wanderRemaining=2+(float)random.NextDouble()*3;
         }
+        float px=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),py=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
+        float memoryRadius=Settings.CollisionMemoryDiameter*.5f;
+        float memoryRadiusX=memoryRadius/Math.Max(1,area.Width),memoryRadiusY=memoryRadius/Math.Max(1,area.Height);
+        Brain.SenseLocation(px,py,memoryRadiusX,memoryRadiusY);
         bool recalling=Fullness<90&&odorStrength<.04f&&Brain.MemoryConfidence>.035f;
         Vector2 remembered=new(area.Left+Brain.RememberedX*area.Width,area.Top+Brain.RememberedY*area.Height);
         Vector2 target=recalling?remembered:wander;
@@ -140,13 +148,34 @@ public sealed class Simulation
         }
         Vector2 away=Position-mouse;if(away.LengthSquared()<1)away=new(1,-1);
         float wall=0,wallTurn=0;
+        Vector2 visualInward=Vector2.Zero;
         if(Settings.EdgeSensing)
         {
             float margin=Math.Min(170,Math.Min(area.Width,area.Height)*.30f);
             float left=Math.Clamp((margin-(Position.X-area.Left))/margin,0,1),right=Math.Clamp((margin-(area.Right-Position.X))/margin,0,1);
             float top=Math.Clamp((margin-(Position.Y-area.Top))/margin,0,1),bottom=Math.Clamp((margin-(area.Bottom-Position.Y))/margin,0,1);
             wall=Math.Max(Math.Max(left,right),Math.Max(top,bottom));
-            var inward=new Vector2(left-right,top-bottom);if(inward.LengthSquared()>.0001f)wallTurn=Wrap(MathF.Atan2(inward.Y,inward.X)+MathF.PI/2-Heading);
+            visualInward=new Vector2(left-right,top-bottom);if(visualInward.LengthSquared()>.0001f)wallTurn=Wrap(MathF.Atan2(visualInward.Y,visualInward.X)+MathF.PI/2-Heading);
+        }
+        var prediction=PredictBoundary(area);
+        PredictiveEdgeRisk=prediction.Risk;
+        var memoryInward=new Vector2(Brain.AvoidanceVectorX,Brain.AvoidanceVectorY);
+        float agreement=memoryInward.LengthSquared()>.001f&&prediction.Inward.LengthSquared()>.001f?Math.Max(0,Vector2.Dot(Vector2.Normalize(memoryInward),prediction.Inward)):0;
+        LearnedEdgeRisk=Math.Clamp(prediction.Risk*Brain.LocalAvoidanceConfidence*(.6f+.4f*agreement),0,1);
+        if(LearnedEdgeRisk>.01f)
+        {
+            var learnedInward=prediction.Inward*(.8f+Brain.AvoidanceSkill*.8f)+memoryInward*.35f;
+            if(learnedInward.LengthSquared()>.001f)learnedInward=Vector2.Normalize(learnedInward);
+            float learnedTurn=Wrap(MathF.Atan2(learnedInward.Y,learnedInward.X)+MathF.PI/2-Heading);
+            float learnedWall=Math.Clamp(LearnedEdgeRisk*(.9f+Brain.AvoidanceSkill*.8f),0,1);
+            if(learnedWall>=wall*.75f)wallTurn=learnedTurn;
+            wall=Math.Max(wall,learnedWall);
+        }
+        if(LearnedEdgeRisk>.12f){avoidanceEpisode=true;avoidanceEpisodePeak=Math.Max(avoidanceEpisodePeak,LearnedEdgeRisk);}
+        else if(avoidanceEpisode&&LearnedEdgeRisk<.035f)
+        {
+            if(avoidanceEpisodePeak>.18f){Brain.ReinforceSuccessfulAvoidance(avoidanceEpisodePeak);avoidanceRewardPulse=1;avoidanceSuccessRemaining=1.35f;SuccessfulEdgeAvoidances++;}
+            avoidanceEpisode=false;avoidanceEpisodePeak=0;
         }
         float targetHeading=MathF.Atan2(desired.Y,desired.X)+MathF.PI/2;
         float delta=Wrap(targetHeading-Heading);
@@ -165,26 +194,34 @@ public sealed class Simulation
         {RestRemaining=1+(float)random.NextDouble()*2.5f;flightDuration=0;}
         bool resting=Settings.RestEnabled&&RestRemaining>0&&threat<.02f&&Alarm<.01f;
         float travel=contact||resting?0:.95f;
-        float px=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),py=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
-        float memoryRadius=Settings.CollisionMemoryDiameter*.5f;
-        float memoryRadiusX=memoryRadius/Math.Max(1,area.Width),memoryRadiusY=memoryRadius/Math.Max(1,area.Height);
         Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),contact?1:0,Fullness,Math.Clamp(threat>.02f?escapeTurn:delta,-1,1),travel,wall,Settings,
-            odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt,memoryRadiusX,memoryRadiusY,false);
+            odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt,memoryRadiusX,memoryRadiusY,false,avoidanceRewardPulse);
         neuralRemainder+=dt;
         while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain);neuralRemainder-=.001f;}
         if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!contact&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
         float steeringIntent=threat>.02f?escapeTurn:delta;
+        float learnedTurnGain=3.6f+LearnedEdgeRisk*(5.5f+Brain.AvoidanceSkill*5.5f);
         float turnRate=Settings.NeuralSteering
-            ? Brain.OptomotorTurn*5.8f+Brain.Turn*2.2f+Brain.OdorTurn*5.6f+Brain.NavigationTurn*3.6f+Brain.DescendingTurn*2.2f+Math.Clamp(steeringIntent,-1,1)*.35f
+            ? Brain.OptomotorTurn*5.8f+Brain.Turn*2.2f+Brain.OdorTurn*5.6f+Brain.NavigationTurn*learnedTurnGain+Brain.DescendingTurn*2.2f+Math.Clamp(steeringIntent,-1,1)*.35f
             : Math.Clamp(threat>.02f?escapeTurn:odorStrength>.02f?odorTurn:delta,-1,1)*6.5f;
+        float avoidanceActivity=Math.Clamp(Brain.NavigationRate/4+Brain.VisualMotionRate/8,0,1);
+        float predictiveNeuralGate=Math.Clamp(LearnedEdgeRisk*avoidanceActivity,0,1);
+        if(Settings.NeuralSteering&&predictiveNeuralGate>.01f)
+        {
+            float learnedNeuralTurn=Brain.NavigationTurn*(8+Brain.AvoidanceSkill*8);
+            turnRate=turnRate*(1-predictiveNeuralGate*.82f)+learnedNeuralTurn*(predictiveNeuralGate*.82f);
+        }
         Heading=Wrap(Heading+turnRate*dt);
         float neuralSpeed=Math.Clamp(Brain.Flight*(1.25f+Brain.WingRate*.006f),0,1.8f);
         float speed=Settings.FlightSpeed*neuralSpeed*(Albino?Settings.AlbinoSpeedMultiplier:1)*(1+Brain.Fear*1.8f+EscapeUrgency*Settings.EscapeAccelerationGain+InjuryArousal*.22f);
+        float learnedBrake=Math.Clamp(LearnedEdgeRisk*avoidanceActivity*(.65f+Brain.AvoidanceSkill*.35f),0,.90f);
+        speed*=1-learnedBrake;
         if(burstRemaining>0)speed*=2.2f;
         if(contact||resting)speed=0;
         Grounded=speed<3&&Velocity.Length()<4;
         if(Grounded)flightDuration=0;else flightDuration+=dt;
         var direction=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));
+        Velocity*=MathF.Exp(-LearnedEdgeRisk*avoidanceActivity*(2+Brain.AvoidanceSkill*6)*dt);
         Velocity=Vector2.Lerp(Velocity,direction*speed,1-MathF.Exp(-8*dt));Position+=Velocity*dt;
         if(Settings.Skin==PetSkin.Cockroach)
         {
@@ -198,6 +235,7 @@ public sealed class Simulation
             edgeShock=1;punishmentPulse=1;Alarm=Math.Max(Alarm,.45f);RestRemaining=0;EdgeCollisions++;
             float collisionX=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),collisionY=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
             Brain.LearnCollision(collisionX,collisionY,memoryRadiusX,memoryRadiusY,Math.Max(.36f,Settings.LearningRate*Settings.EdgePunishment*2.4f));
+            avoidanceEpisode=false;avoidanceEpisodePeak=0;avoidanceSuccessRemaining=0;
         }
         bool ate=false,feeding=false;
         if(contact&&food!=null)
@@ -210,8 +248,32 @@ public sealed class Simulation
         {
             float amount=Math.Min(100-Fullness,Settings.SugarNutrition);Fullness+=amount;Health=Math.Min(MaxHealth,Health+amount*.3f);rewardPulse=1;ate=true;Sugars.Remove(feedingSugar);feedingSugar=null;feedingElapsed=0;
         }
-        Behavior=collided?"撞击边缘并记住":rapidTurnRemaining>0?"急转逃逸":EscapeUrgency>.35f?"持续加速逃逸":threat>.02f||Brain.Fear>.2f?"逃离鼠标":ate?"吃掉糖粒并记住":feeding?"进食中":Grounded?"停歇":odorStrength>.02f&&Fullness<95?"循着糖味":recalling?"回忆常见糖点":avoidingMemory?"避开负面位置":wall>.25f?"视觉避开边缘":"自由飞行";
+        Behavior=collided?"撞到边缘，强化危险记忆":avoidanceSuccessRemaining>0?"成功避开记忆边缘":LearnedEdgeRisk>.10f?"回忆危险，提前转向":rapidTurnRemaining>0?"急转逃逸":EscapeUrgency>.35f?"持续加速逃逸":threat>.02f||Brain.Fear>.2f?"逃离鼠标":ate?"吃掉糖粒并记住":feeding?"进食中":Grounded?"停歇":odorStrength>.02f&&Fullness<95?"循着糖味":recalling?"回忆常见糖点":avoidingMemory?"避开负面位置":wall>.25f?"视觉避开边缘":"自由飞行";
     }
+    BoundaryPrediction PredictBoundary(Rectangle area)
+    {
+        float bodyMargin=Math.Min(DisplaySize*.32f,Math.Min(area.Width,area.Height)*.2f);
+        var headingDirection=new Vector2(MathF.Sin(Heading),-MathF.Cos(Heading));
+        float intentSpeed=Math.Max(Velocity.Length(),Settings.FlightSpeed*(.30f+Brain.Flight*.18f));
+        var projectedVelocity=Velocity.LengthSquared()>4?Vector2.Lerp(headingDirection*intentSpeed,Velocity,.62f):headingDirection*intentSpeed;
+        float horizon=1.20f+Brain.AvoidanceSkill*.80f;
+        Vector2 inward=Vector2.Zero;float risk=0;
+        void Consider(float distance,float closing,Vector2 normal)
+        {
+            if(closing<=1)return;
+            float time=Math.Max(0,distance)/closing;
+            float candidate=Math.Clamp(1-time/horizon,0,1);
+            if(candidate<=0)return;
+            inward+=normal*candidate*candidate;risk=Math.Max(risk,candidate);
+        }
+        Consider(Position.X-(area.Left+bodyMargin),-projectedVelocity.X,Vector2.UnitX);
+        Consider((area.Right-bodyMargin)-Position.X,projectedVelocity.X,-Vector2.UnitX);
+        Consider(Position.Y-(area.Top+bodyMargin),-projectedVelocity.Y,Vector2.UnitY);
+        Consider((area.Bottom-bodyMargin)-Position.Y,projectedVelocity.Y,-Vector2.UnitY);
+        if(inward.LengthSquared()>.001f)inward=Vector2.Normalize(inward);
+        return new(risk,inward);
+    }
+    readonly record struct BoundaryPrediction(float Risk,Vector2 Inward);
     bool ClampPosition(Rectangle area)
     {
         float margin=Math.Min(DisplaySize*.32f,Math.Min(area.Width,area.Height)*.2f);

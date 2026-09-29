@@ -68,7 +68,7 @@ final class PetView: NSView {
 }
 
 struct EngineTick: Codable { let dt: Float; let left, top, width, height: Int; let mouseX, mouseY: Float; let threat: Bool; let action: String? }
-struct EngineState: Codable { let x, y, heading, speed, health, fullness: Float; let size: Int; let skin, behavior: String; let dead: Bool; let spikes: Int64; let neurons, edges: Int }
+struct EngineState: Codable { let x, y, heading, speed, health, fullness: Float; let size: Int; let skin, behavior: String; let dead: Bool; let spikes: Int64; let neurons, edges: Int; let avoidanceSkill, learnedEdgeRisk, navigationRate: Float; let successfulAvoidances, edgeCollisions: Int }
 
 final class BrainEngine {
     private let process = Process(), input = Pipe(), output = Pipe()
@@ -136,18 +136,19 @@ final class PetController: NSObject {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var statusItem: NSStatusItem!, pet: PetController!, visibleItem: NSMenuItem!, pauseItem: NSMenuItem!, skinItem: NSMenuItem!
+    private var statusItem: NSStatusItem!, pet: PetController!, visibleItem: NSMenuItem!, pauseItem: NSMenuItem!, skinItem: NSMenuItem!, learningItem: NSMenuItem!
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory); statusItem=NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         if let b=statusItem.button { b.image=Self.menuBarIcon(); b.image?.isTemplate=true; b.toolTip="FlyPet · MaleCNS 桌宠" }
-        let menu=NSMenu(); let title=NSMenuItem(title:"FlyPet · MaleCNS",action:nil,keyEquivalent:""); title.isEnabled=false; menu.addItem(title); menu.addItem(.separator())
+        let menu=NSMenu(); let title=NSMenuItem(title:"FlyPet · MaleCNS",action:nil,keyEquivalent:""); title.isEnabled=false; menu.addItem(title)
+        learningItem=NSMenuItem(title:"脑引擎正在启动…",action:nil,keyEquivalent:""); learningItem.isEnabled=false; menu.addItem(learningItem); menu.addItem(.separator())
         visibleItem=menu.addItem(withTitle:"隐藏桌宠",action:#selector(toggleVisible),keyEquivalent:"h"); pauseItem=menu.addItem(withTitle:"暂停",action:#selector(togglePause),keyEquivalent:"p")
         skinItem=menu.addItem(withTitle:"切换为广东双马尾",action:#selector(switchSkin),keyEquivalent:"k"); menu.addItem(withTitle:"在鼠标处投糖",action:#selector(dropSugar),keyEquivalent:"s")
         menu.addItem(withTitle:"召回桌宠",action:#selector(recenter),keyEquivalent:"r"); menu.addItem(withTitle:"立即复活",action:#selector(revive),keyEquivalent:""); menu.addItem(.separator()); menu.addItem(withTitle:"退出 FlyPet",action:#selector(quit),keyEquivalent:"q")
         for item in menu.items { item.target=self }; statusItem.menu=menu
         pet=PetController(); pet.onStatusChanged={ [weak self] in self?.refreshMenu() }; pet.start(); refreshMenu()
     }
-    private func refreshMenu() { visibleItem.title=pet.hidden ? "显示桌宠":"隐藏桌宠"; pauseItem.title=pet.paused ? "继续":"暂停"; skinItem.title=pet.view.skin == .fly ? "切换为广东双马尾":"切换为果蝇"; statusItem.button?.toolTip="FlyPet · 生命 \(Int(pet.view.health))% · 饱腹 \(Int(pet.view.fullness))%" }
+    private func refreshMenu() { visibleItem.title=pet.hidden ? "显示桌宠":"隐藏桌宠"; pauseItem.title=pet.paused ? "继续":"暂停"; skinItem.title=pet.view.skin == .fly ? "切换为广东双马尾":"切换为果蝇"; if let state=pet.engine?.state { learningItem.title="边缘经验 \(Int(state.avoidanceSkill*100))% · 成功 \(state.successfulAvoidances) · 撞击 \(state.edgeCollisions)"; statusItem.button?.toolTip="FlyPet · \(state.behavior) · 导航 \(String(format:"%.1f",state.navigationRate)) Hz" } else { learningItem.title="脑引擎正在启动…"; statusItem.button?.toolTip="FlyPet · MaleCNS 脑引擎正在启动" } }
     @objc private func toggleVisible(){pet.toggleVisible()}; @objc private func togglePause(){pet.togglePause()}; @objc private func switchSkin(){pet.switchSkin()}; @objc private func dropSugar(){pet.dropSugar()}; @objc private func recenter(){pet.recenter()}; @objc private func revive(){pet.revive()}; @objc private func quit(){NSApp.terminate(nil)}
     static func menuBarIcon() -> NSImage {
         let image=NSImage(size:NSSize(width:18,height:18),flipped:false){ _ in NSColor.black.setFill(); NSBezierPath(ovalIn:NSRect(x:6.5,y:3,width:5,height:11)).fill(); NSBezierPath(ovalIn:NSRect(x:1.5,y:7,width:6,height:5)).fill(); NSBezierPath(ovalIn:NSRect(x:10.5,y:7,width:6,height:5)).fill(); NSBezierPath(ovalIn:NSRect(x:6,y:12,width:6,height:5)).fill(); return true }; image.isTemplate=true; return image

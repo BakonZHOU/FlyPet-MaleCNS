@@ -41,7 +41,7 @@ public sealed class BrainMapWindow : Form
         if(IsDisposed||!Visible||clock.Elapsed.TotalSeconds-lastSample<.1)return;
         lastSample=clock.Elapsed.TotalSeconds;timeline.Record();map.Invalidate();timeline.Invalidate();
         if(selected>=0)UpdateDetails();
-        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n视觉 {b.VisualRate:0.0} · 嗅觉 {b.OlfactoryRate:0.0} Hz\n导航 {b.NavigationRate:0.0} Hz · 转向 {b.NavigationTurn:+0.00;-0.00;0.00}\n逃逸原始 {b.EscapeRate:0.0} Hz · 有效 {b.Fear:0.00}\n记忆 {b.MemoryConfidence:0.00} · 奖励 {b.RewardSignal:+0.00;-0.00;0.00}";
+        var b=app.Sim.Brain;summary.Text=$"神经元 {b.NeuronCount:N0} · 连接 {b.EdgeCount:N0}\n视觉 {b.VisualRate:0.0} · 嗅觉 {b.OlfactoryRate:0.0} Hz\n导航 {b.NavigationRate:0.0} Hz · 转向 {b.NavigationTurn:+0.00;-0.00;0.00}\n边缘经验 {b.AvoidanceSkill:0.00} · 风险 {app.Sim.LearnedEdgeRisk:0.00}\n记忆 {b.MemoryConfidence:0.00} · 奖励 {b.RewardSignal:+0.00;-0.00;0.00}";
     }
     void UpdateDetails()
     {

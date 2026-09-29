@@ -1,7 +1,7 @@
 name: Build and self-test
 
 env:
-  RELEASE_VERSION: 1.1.2
+  RELEASE_VERSION: 1.1.3
 
 on:
   push:
@@ -106,4 +106,8 @@ jobs:
             Windows 解压后双击 `FlyPet.exe`。Mac 打开 DMG 后将应用拖入“应用程序”。
 
             macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按应用，再选择“打开”。
+
+            ## 本版重点
+
+            撞击惩罚现在会形成边缘位置记忆并增强导航通路；再次接近时，由视觉运动与导航神经群的实际放电触发提前转向和制动。Windows 小窝和 macOS 菜单均显示边缘经验、成功回避和撞击次数。
 

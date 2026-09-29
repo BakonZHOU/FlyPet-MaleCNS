@@ -79,6 +79,9 @@ static class Program
         x = s.Position.X, y = s.Position.Y, heading = s.Heading, speed = s.Velocity.Length(),
         health = s.Health, fullness = s.Fullness, size = s.DisplaySize,
         skin = s.Settings.Skin.ToString().ToLowerInvariant(), dead = s.Dead, behavior = s.Behavior,
-        spikes = s.Brain.TotalSpikes, neurons = circuit.Nodes.Length, edges = circuit.Edges.Length
+        spikes = s.Brain.TotalSpikes, neurons = circuit.Nodes.Length, edges = circuit.Edges.Length,
+        avoidanceSkill = s.Brain.AvoidanceSkill, learnedEdgeRisk = s.LearnedEdgeRisk,
+        successfulAvoidances = s.SuccessfulEdgeAvoidances, edgeCollisions = s.EdgeCollisions,
+        navigationRate = s.Brain.NavigationRate
     };
 }

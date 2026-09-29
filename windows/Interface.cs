@@ -57,7 +57,7 @@ public sealed class Dashboard : Form
         flyButton=Theme.Button("果蝇",262,112,128,()=>app.SelectSkin(PetSkin.Fly));Controls.Add(flyButton);
         roachButton=Theme.Button("广东双马尾",399,112,169,()=>app.SelectSkin(PetSkin.Cockroach));Controls.Add(roachButton);
         status=Theme.Label("",264,165,300,34,11,Theme.Accent);Controls.Add(status);
-        metrics=Theme.Label("",264,199,300,27,9,Theme.Muted);Controls.Add(metrics);
+        metrics=Theme.Label("",264,199,300,40,9,Theme.Muted);Controls.Add(metrics);
         Controls.Add(Theme.Button("投糖",262,244,91,()=>{app.StartPet();app.SetMode(ToolMode.Sugar);Hide();}));
         Controls.Add(Theme.Button("设置",364,244,91,()=>app.ShowSettings()));
         Controls.Add(Theme.Button("大脑图",466,244,102,()=>app.ShowBrainMap()));
@@ -77,7 +77,7 @@ public sealed class Dashboard : Form
     public void RefreshStatus()
     {
         var s=app.Sim;status.Text=s.Dead?$"等待复活 · {s.DeathRemaining:0} 秒":app.BehaviorLabel;
-        metrics.Text=$"生命 {s.Health/s.MaxHealth*100:0}%   饱腹 {s.Fullness:0}%   {s.DisplaySize} px";preview.Invalidate();
+        metrics.Text=$"生命 {s.Health/s.MaxHealth*100:0}%   饱腹 {s.Fullness:0}%   {s.DisplaySize} px\n边缘经验 {s.Brain.AvoidanceSkill*100:0}%   成功避开 {s.SuccessfulEdgeAvoidances}   撞击 {s.EdgeCollisions}";preview.Invalidate();
     }
     public void Shutdown(){exiting=true;Close();}
 }
@@ -104,7 +104,7 @@ public sealed class NeuralEvidenceWindow : Form
     public void RefreshEvidence()
     {
         if(IsDisposed)return;var b=app.Sim.Brain;bars.Invalidate();
-        values.Text=$"视觉回路            {b.VisualRate,7:0.0} Hz\n嗅觉回路            {b.OlfactoryRate,7:0.0} Hz\n蘑菇体记忆          {b.MemoryRate,7:0.0} Hz\n奖励 DAN            {b.RewardRate,7:0.0} Hz\n中央复合体导航      {b.NavigationRate,7:0.0} Hz\n下行 / 运动         {b.DescendingRate,7:0.0} / {b.MotorRate:0.0} Hz\n记忆置信            {b.MemoryConfidence,7:0.00}\n累计放电            {b.TotalSpikes,10:N0}";
+        values.Text=$"视觉回路            {b.VisualRate,7:0.0} Hz\n嗅觉回路            {b.OlfactoryRate,7:0.0} Hz\n蘑菇体记忆          {b.MemoryRate,7:0.0} Hz\n奖励 DAN            {b.RewardRate,7:0.0} Hz\n中央复合体导航      {b.NavigationRate,7:0.0} Hz\n下行 / 运动         {b.DescendingRate,7:0.0} / {b.MotorRate:0.0} Hz\n边缘经验            {b.AvoidanceSkill,7:0.00}\n累计放电            {b.TotalSpikes,10:N0}";
     }
     async void RunAudit()
     {
