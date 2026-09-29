@@ -67,15 +67,49 @@ final class PetView: NSView {
     }
 }
 
+struct EngineTick: Codable { let dt: Float; let left, top, width, height: Int; let mouseX, mouseY: Float; let threat: Bool; let action: String? }
+struct EngineState: Codable { let x, y, heading, speed, health, fullness: Float; let size: Int; let skin, behavior: String; let dead: Bool; let spikes: Int64; let neurons, edges: Int }
+
+final class BrainEngine {
+    private let process = Process(), input = Pipe(), output = Pipe()
+    private var buffer = Data(), waiting = false
+    private(set) var state: EngineState?
+    init?() {
+        #if arch(arm64)
+        let architecture = "arm64"
+        #else
+        let architecture = "x86_64"
+        #endif
+        guard let resources = Bundle.main.resourceURL else { return nil }
+        process.executableURL = resources.appendingPathComponent("engine-\(architecture)/FlyPet.Engine")
+        process.standardInput = input; process.standardOutput = output; process.standardError = Pipe()
+        do { try process.run() } catch { return nil }
+        output.fileHandleForReading.readabilityHandler = { [weak self] handle in self?.receive(handle.availableData) }
+    }
+    deinit { output.fileHandleForReading.readabilityHandler = nil; process.terminate() }
+    @discardableResult func tick(_ request: EngineTick) -> Bool {
+        guard process.isRunning, !waiting, let data = try? JSONEncoder().encode(request) else { return false }
+        waiting = true; input.fileHandleForWriting.write(data); input.fileHandleForWriting.write(Data([10]))
+        return true
+    }
+    private func receive(_ data: Data) {
+        guard !data.isEmpty else { return }; buffer.append(data)
+        while let newline = buffer.firstIndex(of: 10) {
+            let line = buffer.prefix(upTo: newline); buffer.removeSubrange(...newline)
+            guard let reply = try? JSONDecoder().decode(EngineState.self, from: line) else { continue }
+            DispatchQueue.main.async { [weak self] in self?.state = reply; self?.waiting = false }
+        }
+    }
+}
+
 final class PetController: NSObject {
     let window: NSWindow, view: PetView
-    var velocity = CGVector(dx: 180, dy: 100), timer: Timer?, hidden = false, paused = false, sugar: CGPoint?
+    let engine: BrainEngine?
+    var timer: Timer?, hidden = false, paused = false
     var onStatusChanged: (() -> Void)?
-    private var lastTime = ProcessInfo.processInfo.systemUptime, wanderAngle = CGFloat.random(in: 0...(2 * .pi)), wanderRemaining: TimeInterval = 1
+    private var lastTime = ProcessInfo.processInfo.systemUptime, pendingAction: String?
     override init() {
-        view = PetView(frame: NSRect(x: 0, y: 0, width: 120, height: 120))
-        view.skin = PetSkin(rawValue: UserDefaults.standard.string(forKey: "skin") ?? "fly") ?? .fly
-        view.isRare = Double.random(in: 0...1) < 0.1
+        view = PetView(frame: NSRect(x: 0, y: 0, width: 120, height: 120)); engine = BrainEngine()
         window = NSWindow(contentRect: view.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         super.init(); window.contentView = view; window.isOpaque = false; window.backgroundColor = .clear; window.hasShadow = false; window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]; window.isMovableByWindowBackground = false
@@ -84,27 +118,20 @@ final class PetController: NSObject {
     func start() { window.orderFrontRegardless(); timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in self?.tick() }; RunLoop.main.add(timer!, forMode: .common) }
     func toggleVisible() { hidden.toggle(); hidden ? window.orderOut(nil) : window.orderFrontRegardless(); onStatusChanged?() }
     func togglePause() { paused.toggle(); onStatusChanged?() }
-    func switchSkin() { view.skin = view.skin == .fly ? .cockroach : .fly; view.isRare = Double.random(in: 0...1) < 0.1; UserDefaults.standard.set(view.skin.rawValue, forKey: "skin"); onStatusChanged?(); view.needsDisplay = true }
-    func dropSugar() { sugar = NSEvent.mouseLocation; onStatusChanged?() }
-    func recenter() { guard let frame = NSScreen.main?.visibleFrame else { return }; window.setFrameOrigin(CGPoint(x: frame.midX-60, y: frame.midY-60)) }
-    func revive() { view.health = 100; view.fullness = 65; view.isRare = Double.random(in: 0...1) < 0.1; paused = false; recenter(); window.orderFrontRegardless(); onStatusChanged?() }
-    private func hit() { view.health = max(0, view.health-40); velocity.dx *= -1.5; velocity.dy *= -1.5; if view.health <= 0 { paused = true }; onStatusChanged?() }
+    func switchSkin() { pendingAction = "skin:\(view.skin == .fly ? "cockroach" : "fly")"; onStatusChanged?() }
+    func dropSugar() { let p=NSEvent.mouseLocation; pendingAction="drop:\(p.x):\(p.y)"; onStatusChanged?() }
+    func recenter() { pendingAction="recenter"; guard let frame=NSScreen.main?.visibleFrame else{return}; window.setFrameOrigin(CGPoint(x:frame.midX-60,y:frame.midY-60)) }
+    func revive() { paused=false; pendingAction="revive"; window.orderFrontRegardless(); onStatusChanged?() }
+    private func hit() { pendingAction="hit:\(window.frame.midX):\(window.frame.midY)" }
     private func tick() {
-        let now = ProcessInfo.processInfo.systemUptime, dt = CGFloat(min(0.05, now-lastTime)); lastTime = now
-        guard !paused, !hidden, view.health > 0, let screen = window.screen ?? NSScreen.main else { return }
-        let frame = screen.visibleFrame.insetBy(dx: 42, dy: 42); var center = CGPoint(x: window.frame.midX, y: window.frame.midY); let mouse = NSEvent.mouseLocation
-        let mx = center.x-mouse.x, my = center.y-mouse.y, distance = hypot(mx,my)
-        wanderRemaining -= Double(dt); if wanderRemaining <= 0 { wanderRemaining = Double.random(in: 1.4...3.8); wanderAngle += CGFloat.random(in: -1.8...1.8) }
-        var desired = CGVector(dx: cos(wanderAngle), dy: sin(wanderAngle)); var targetSpeed: CGFloat = view.skin == .cockroach ? 190 : 235
-        if let food = sugar { let fx=food.x-center.x, fy=food.y-center.y, fd=max(1,hypot(fx,fy)); if fd < 45 { sugar=nil; view.fullness=min(100,view.fullness+32); view.health=min(100,view.health+10) } else if view.fullness < 92 { desired=CGVector(dx: fx/fd,dy: fy/fd) } }
-        if distance < 260 { let d=max(1,distance); desired=CGVector(dx: mx/d,dy: my/d); targetSpeed *= 2.7 }
-        let blend=1-exp(-5*dt); velocity.dx += (desired.dx*targetSpeed-velocity.dx)*blend; velocity.dy += (desired.dy*targetSpeed-velocity.dy)*blend
-        center.x += velocity.dx*dt; center.y += velocity.dy*dt
-        if center.x < frame.minX || center.x > frame.maxX { velocity.dx *= -0.72; center.x=min(frame.maxX,max(frame.minX,center.x)); wanderAngle=atan2(velocity.dy,velocity.dx) }
-        if center.y < frame.minY || center.y > frame.maxY { velocity.dy *= -0.72; center.y=min(frame.maxY,max(frame.minY,center.y)); wanderAngle=atan2(velocity.dy,velocity.dx) }
-        let size: CGFloat = view.skin == .cockroach ? (view.isRare ? 300 : 132) : 112
-        window.setFrame(NSRect(x: center.x-size/2,y: center.y-size/2,width: size,height: size), display: false)
-        view.heading=atan2(velocity.dx,velocity.dy); view.speed=hypot(velocity.dx,velocity.dy); view.fullness=max(0,view.fullness-dt*0.01); view.advance(dt)
+        let now=ProcessInfo.processInfo.systemUptime, dt=Float(min(0.05,now-lastTime)); lastTime=now
+        guard !paused, !hidden, let screen=window.screen ?? NSScreen.main else { return }
+        let frame=screen.visibleFrame, mouse=NSEvent.mouseLocation
+        let sent = engine?.tick(EngineTick(dt:dt,left:Int(frame.minX),top:Int(frame.minY),width:Int(frame.width),height:Int(frame.height),mouseX:Float(mouse.x),mouseY:Float(mouse.y),threat:true,action:pendingAction)) ?? false
+        if sent { pendingAction=nil }
+        guard let state=engine?.state else { return }
+        view.skin=PetSkin(rawValue:state.skin) ?? .fly; view.heading=CGFloat(state.heading); view.speed=CGFloat(state.speed); view.health=CGFloat(state.health); view.fullness=CGFloat(state.fullness)
+        let size=CGFloat(state.size); window.setFrame(NSRect(x:CGFloat(state.x)-size/2,y:CGFloat(state.y)-size/2,width:size,height:size),display:false); view.advance(CGFloat(dt)); onStatusChanged?()
     }
 }
 

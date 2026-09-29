@@ -1,7 +1,7 @@
 name: Build and self-test
 
 env:
-  RELEASE_VERSION: 1.1.0
+  RELEASE_VERSION: 1.1.1
 
 on:
   push:
@@ -48,6 +48,9 @@ jobs:
           - { label: Universal-2, archs: "arm64 x86_64" }
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
       - name: Build app and DMG
         env:
           ARCHS: ${{ matrix.archs }}
@@ -58,6 +61,11 @@ jobs:
           file .build/macos/FlyPet.app/Contents/MacOS/FlyPet
           codesign --verify --deep --strict .build/macos/FlyPet.app
           test -f .build/macos/FlyPet.app/Contents/Resources/FlyPet.icns
+          engine=.build/macos/FlyPet.app/Contents/Resources/engine-${{ matrix.archs == 'x86_64' && 'x86_64' || 'arm64' }}/FlyPet.Engine
+          test -x "$engine"
+          printf '{"dt":0.008,"left":0,"top":0,"width":1440,"height":900,"mouseX":-5000,"mouseY":-5000,"threat":false}\n' | "$engine" > .build/macos/engine-reply.json
+          grep '"neurons":16711' .build/macos/engine-reply.json
+          grep '"edges":2075126' .build/macos/engine-reply.json
       - uses: actions/upload-artifact@v4
         with:
           name: FlyPet-macOS-${{ matrix.label }}

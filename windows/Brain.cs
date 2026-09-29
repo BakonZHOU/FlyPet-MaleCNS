@@ -222,12 +222,14 @@ public sealed class Brain
         {
             float dx=positionX-placeX[i],dy=positionY-placeY[i],scaledX=dx/radiusX,scaledY=dy/radiusY,d2=scaledX*scaledX+scaledY*scaledY;
             if(d2<.000001f)continue;
-            if(d2>4)continue;
-            float scaledLength=MathF.Sqrt(d2),influence=-placeValue[i]*MathF.Exp(-2.3f*d2);
+            // Keep a learned danger visible while the animal is still approaching it.
+            // A tighter falloff made it react only after it was almost at the same wall again.
+            if(d2>6.25f)continue;
+            float scaledLength=MathF.Sqrt(d2),influence=-placeValue[i]*MathF.Exp(-.85f*d2);
             x+=scaledX/scaledLength*influence;y+=scaledY/scaledLength*influence;total+=influence;
         }
         float length=MathF.Sqrt(x*x+y*y);if(length>.0001f){AvoidanceVectorX=x/length;AvoidanceVectorY=y/length;}else AvoidanceVectorX=AvoidanceVectorY=0;
-        LocalAvoidanceConfidence=Math.Clamp(total,0,1);
+        LocalAvoidanceConfidence=Math.Clamp(total*1.35f,0,1);
     }
     public void LearnCollision(float positionX,float positionY,float radiusX,float radiusY,float strength)
     {

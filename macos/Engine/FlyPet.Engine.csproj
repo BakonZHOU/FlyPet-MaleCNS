@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>FlyPet.Engine</AssemblyName>
+    <SelfContained>true</SelfContained>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../windows/Brain.cs" Link="Brain.cs" />
+    <Compile Include="../../windows/Settings.cs" Link="Settings.cs" />
+    <Compile Include="../../windows/Simulation.cs" Link="Simulation.cs" />
+    <EmbeddedResource Include="../../windows/Assets/circuit.json" LogicalName="FlyPet.Assets.circuit.json" />
+  </ItemGroup>
+</Project>

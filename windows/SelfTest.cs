@@ -99,6 +99,9 @@ static class SelfTest
         collisionRange.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:.56f,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);float nearbyCollisionMemory=collisionRange.LocalAvoidanceConfidence;
         collisionRange.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:.72f,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);float distantCollisionMemory=collisionRange.LocalAvoidanceConfidence;
         Check("collision_memory_has_300px_diameter",nearbyCollisionMemory>.02f&&nearbyCollisionMemory>distantCollisionMemory*3,new{nearbyCollisionMemory,distantCollisionMemory,diameter=300});
+        var predictiveAvoidance=new Brain(data);predictiveAvoidance.LearnCollision(.5f,.027f,collisionRadiusX,collisionRadiusY,.36f);
+        predictiveAvoidance.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:.50f,positionY:.13f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);
+        Check("one_collision_creates_inward_preemptive_turn",predictiveAvoidance.LocalAvoidanceConfidence>.18f&&predictiveAvoidance.AvoidanceVectorY>.7f,new{local=predictiveAvoidance.LocalAvoidanceConfidence,awayY=predictiveAvoidance.AvoidanceVectorY});
         var topCoverage=new Brain(data);for(int i=0;i<16;i++)topCoverage.LearnCollision((i+.5f)/16,.027f,collisionRadiusX,collisionRadiusY,.22f);
         float weakestTopMemory=1;for(int i=0;i<32;i++){topCoverage.SetInput(0,0,60,0,.95f,0,learningSettings,positionX:(i+.5f)/32,positionY:.08f,frameDt:1f/120,avoidanceRadiusX:collisionRadiusX,avoidanceRadiusY:collisionRadiusY);weakestTopMemory=Math.Min(weakestTopMemory,topCoverage.LocalAvoidanceConfidence);}
         Check("sixteen_impacts_cover_top_edge",weakestTopMemory>.02f,new{impacts=16,weakestTopMemory,diameter=300});

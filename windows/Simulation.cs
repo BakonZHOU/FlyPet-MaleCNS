@@ -134,7 +134,9 @@ public sealed class Simulation
         if(avoidingMemory)
         {
             float avoidanceRange=Math.Min(area.Width,area.Height)*.38f;
-            desired+=new Vector2(Brain.AvoidanceVectorX,Brain.AvoidanceVectorY)*avoidanceRange*Brain.LocalAvoidanceConfidence*2.8f;
+            // Negative place memory is predictive: one impact already supplies a clear
+            // inward steering bias on the next approach, and repeats reinforce it.
+            desired+=new Vector2(Brain.AvoidanceVectorX,Brain.AvoidanceVectorY)*avoidanceRange*(.8f+Brain.LocalAvoidanceConfidence*6.4f);
         }
         Vector2 away=Position-mouse;if(away.LengthSquared()<1)away=new(1,-1);
         float wall=0,wallTurn=0;
@@ -195,7 +197,7 @@ public sealed class Simulation
         {
             edgeShock=1;punishmentPulse=1;Alarm=Math.Max(Alarm,.45f);RestRemaining=0;EdgeCollisions++;
             float collisionX=Math.Clamp((Position.X-area.Left)/Math.Max(1,area.Width),0,1),collisionY=Math.Clamp((Position.Y-area.Top)/Math.Max(1,area.Height),0,1);
-            Brain.LearnCollision(collisionX,collisionY,memoryRadiusX,memoryRadiusY,Math.Max(.14f,Settings.LearningRate*Settings.EdgePunishment*1.5f));
+            Brain.LearnCollision(collisionX,collisionY,memoryRadiusX,memoryRadiusY,Math.Max(.36f,Settings.LearningRate*Settings.EdgePunishment*2.4f));
         }
         bool ate=false,feeding=false;
         if(contact&&food!=null)
