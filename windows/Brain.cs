@@ -165,24 +165,53 @@ public sealed class Brain
         }
         UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY,avoidanceRadiusX,avoidanceRadiusY);
     }
-    public void Step(float gain)
+    public unsafe void Step(float gain,bool sampleOutputs=true)
     {
         // 1 ms exponential Euler LIF: Vrest/reset -52 mV, threshold -45 mV,
         // tau_m 20 ms, tau_syn 5 ms, adaptation 1.5 mV/spike, 2 ms synaptic delay, 3 ms refractory.
         int count=0;
         var arriving=delayed[delaySlot];
-        for(int i=0;i<voltage.Length;i++)
+        fixed(float* voltagePtr=voltage,currentPtr=current,ratesPtr=rates,drivePtr=drive,adaptationPtr=adaptation,arrivingPtr=arriving)
+        fixed(byte* refractoryPtr=refractory)
+        fixed(int* spikesPtr=spikes)
         {
-            current[i]=Math.Clamp(current[i]*.81873075f+arriving[i],-40,40);arriving[i]=0;
-            adaptation[i]*=.9950125f;rates[i]*=.9900498f;
-            if(refractory[i]>0){refractory[i]--;continue;}
-            voltage[i]=-52+(voltage[i]+52)*.95122945f+(current[i]+drive[i]-adaptation[i])*.04877055f;
-            if(voltage[i]>=-45){voltage[i]=-52;refractory[i]=3;adaptation[i]+=1.5f;rates[i]+=10;spikes[count++]=i;}
+            for(int i=0;i<voltage.Length;i++)
+            {
+                currentPtr[i]=Math.Clamp(currentPtr[i]*.81873075f+arrivingPtr[i],-40,40);arrivingPtr[i]=0;
+                adaptationPtr[i]*=.9950125f;ratesPtr[i]*=.9900498f;
+                if(refractoryPtr[i]>0){refractoryPtr[i]--;continue;}
+                voltagePtr[i]=-52+(voltagePtr[i]+52)*.95122945f+(currentPtr[i]+drivePtr[i]-adaptationPtr[i])*.04877055f;
+                if(voltagePtr[i]>=-45){voltagePtr[i]=-52;refractoryPtr[i]=3;adaptationPtr[i]+=1.5f;ratesPtr[i]+=10;spikesPtr[count++]=i;}
+            }
+            var future=delayed[(delaySlot+2)%3];
+            // CircuitData validates every index before these arrays are built. Pointer
+            // traversal removes repeated CLR bounds checks from the 1 kHz hot path;
+            // the equations and accumulation order remain unchanged.
+            fixed(float* futurePtr=future,weightsPtr=weights)
+            fixed(int* offsetsPtr=offsets,targetsPtr=targets)
+            {
+                // NeuralGain is normally exactly one. Avoid multiplying every traversed
+                // synapse in that common case. A severed graph skips propagation.
+                if(gain==1)
+                {
+                    for(int k=0;k<count;k++)for(int j=offsetsPtr[spikesPtr[k]];j<offsetsPtr[spikesPtr[k]+1];j++)futurePtr[targetsPtr[j]]+=weightsPtr[j];
+                }
+                else if(gain!=0)
+                {
+                    for(int k=0;k<count;k++)for(int j=offsetsPtr[spikesPtr[k]];j<offsetsPtr[spikesPtr[k]+1];j++)futurePtr[targetsPtr[j]]+=weightsPtr[j]*gain;
+                }
+            }
         }
-        var future=delayed[(delaySlot+2)%3];
-        for(int k=0;k<count;k++)for(int j=offsets[spikes[k]];j<offsets[spikes[k]+1];j++)future[targets[j]]+=weights[j]*gain;
         delaySlot=(delaySlot+1)%3;
         TotalSpikes+=count;
+        if(sampleOutputs)SampleOutputs(gain);
+    }
+    public void SampleOutputs(float gain)
+    {
+        // The neural state still advances at 1 kHz. The body only consumes these
+        // aggregate rates at 120 Hz, so recomputing the same group scans after every
+        // millisecond was pure overhead. Sampling here preserves the final state and
+        // all spikes while avoiding seven redundant scans per body update.
         VisualRate=Mean(groups["visual"]);TasteRate=Mean(groups["taste"]);EscapeRate=Mean(groups["escape"]);
         FlightRate=Mean(groups["flight"]);WingRate=Mean(groups["wing"]);FeedRate=Mean(groups["feed"]);
         OptomotorRate=Mean(optomotor);ReverseRate=Mean(reverse);

@@ -44,6 +44,8 @@ public sealed class LayerWindow : Form
     protected override CreateParams CreateParams {get{var p=base.CreateParams;p.ExStyle|=0x80000|0x20|0x80|0x08000000;return p;}}
     public void Render(int x,int y,int size,Action<Graphics> draw)
         =>Render(x,y,size,size,draw);
+    public void MoveTo(int x,int y)
+        =>Native.SetWindowPos(Handle,0,x,y,0,0,0x0001|0x0004|0x0010);
     public void Render(int x,int y,int width,int height,Action<Graphics> draw)
     {
         if(canvas.Width!=width||canvas.Height!=height)
@@ -72,12 +74,14 @@ public sealed class MouseHook : IDisposable
     readonly nint handle;
     readonly Func<Point,bool> onDown;
     readonly Func<Point,Point?>? onMove;
-    bool consumeRelease;
+    readonly Func<Point,bool>? onRightDown;
+    readonly Action<Point>? onLeftUp;
+    bool consumeLeftRelease,consumeRightRelease;
     bool correctingMove;
     Point? expectedCorrection;
-    public MouseHook(Func<Point,bool> handler,Func<Point,Point?>? moveHandler=null)
+    public MouseHook(Func<Point,bool> handler,Func<Point,Point?>? moveHandler=null,Func<Point,bool>? rightHandler=null,Action<Point>? leftUpHandler=null)
     {
-        onDown=handler;onMove=moveHandler;proc=Callback;handle=Native.SetWindowsHookEx(14,proc,Native.GetModuleHandle(null),0);
+        onDown=handler;onMove=moveHandler;onRightDown=rightHandler;onLeftUp=leftUpHandler;proc=Callback;handle=Native.SetWindowsHookEx(14,proc,Native.GetModuleHandle(null),0);
         if(handle==0)throw new Win32Exception(Marshal.GetLastWin32Error(),"无法启用鼠标交互");
     }
     nint Callback(int code,nint w,nint l)
@@ -103,8 +107,14 @@ public sealed class MouseHook : IDisposable
                     return 1;
                 }
             }
-            if(w==0x201){var d=Marshal.PtrToStructure<Native.MouseData>(l);consumeRelease=onDown(new(d.Point.X,d.Point.Y));if(consumeRelease)return 1;}
-            if(w==0x202&&consumeRelease){consumeRelease=false;return 1;}
+            if(w==0x201){var d=Marshal.PtrToStructure<Native.MouseData>(l);consumeLeftRelease=onDown(new(d.Point.X,d.Point.Y));if(consumeLeftRelease)return 1;}
+            if(w==0x202)
+            {
+                var d=Marshal.PtrToStructure<Native.MouseData>(l);onLeftUp?.Invoke(new(d.Point.X,d.Point.Y));
+                if(consumeLeftRelease){consumeLeftRelease=false;return 1;}
+            }
+            if(w==0x204&&onRightDown!=null){var d=Marshal.PtrToStructure<Native.MouseData>(l);consumeRightRelease=onRightDown(new(d.Point.X,d.Point.Y));if(consumeRightRelease)return 1;}
+            if(w==0x205&&consumeRightRelease){consumeRightRelease=false;return 1;}
         }
         return Native.CallNextHookEx(handle,code,w,l);
     }

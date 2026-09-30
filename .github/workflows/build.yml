@@ -1,7 +1,7 @@
 name: Build and self-test
 
 env:
-  RELEASE_VERSION: 1.1.11
+  RELEASE_VERSION: 1.1.13
 
 on:
   push:
@@ -109,7 +109,7 @@ jobs:
 
             ## 本版重点
 
-            Windows 版加入瞬机与铜头铁臂防御招式、3D 翻滚残影、本体金光动画及独立多声部音效；修复连续触发音效时的原生缓冲崩溃，并优化窗口、碰撞范围、饱食度和大脑活动图。
+            共享脑引擎继续以 1 ms 步长计算全部神经元和突触，同时减少重复的群组扫描，改善老设备上的运行效率。Windows 版同时加入糖粒拖动、右键取消投糖及召回后的计时修正。
 
-            macOS 同步使用 v1.1.11 的共享脑引擎与模拟逻辑，并提供 Apple Silicon、Intel 和 Universal 2 三种构建。
+            macOS 使用相同的 v1.1.13 脑引擎与模拟逻辑，提供 Apple Silicon、Intel 和 Universal 2 三种安装包。
 

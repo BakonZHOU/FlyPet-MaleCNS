@@ -195,6 +195,20 @@ static class SelfTest
         var healing=Make(new(){HungerPerMinute=0,FlightFullnessCostPerSecond=0,SatiatedThreshold=80,SatiatedRegenPerSecond=2});healing.Fullness=90;healing.Health=50;Advance(healing,2);
         Check("satiated_fly_regenerates_health",healing.Health>=53.8f,new{health=healing.Health,fullness=healing.Fullness});
         var invalid=new Settings{FramesPerSecond=999,PetSize=-2,NeuralGain=float.NaN,RespawnMinSeconds=5,RespawnMaxSeconds=-9};invalid.Validate();Check("configuration_validation",invalid.FramesPerSecond==120&&invalid.PetSize==60&&invalid.NeuralGain==1&&invalid.RespawnMaxSeconds==5);
+        var sampledEveryMs=new Brain(data);var sampledPerFrame=new Brain(data);var sampleSettings=new Settings();
+        sampledEveryMs.SetInput(0,0,20,.4f,.95f,.2f,sampleSettings,odor:.5f,odorTurn:.3f,wallTurn:-.2f);
+        sampledPerFrame.SetInput(0,0,20,.4f,.95f,.2f,sampleSettings,odor:.5f,odorTurn:.3f,wallTurn:-.2f);
+        for(int i=0;i<25;i++){sampledEveryMs.Step(1);sampledPerFrame.Step(1,false);}sampledPerFrame.SampleOutputs(1);
+        Check("batched_output_sampling_is_state_equivalent",sampledEveryMs.TotalSpikes==sampledPerFrame.TotalSpikes&&sampledEveryMs.Flight==sampledPerFrame.Flight&&sampledEveryMs.Fear==sampledPerFrame.Fear&&sampledEveryMs.OlfactoryRate==sampledPerFrame.OlfactoryRate&&sampledEveryMs.NavigationRate==sampledPerFrame.NavigationRate&&sampledEveryMs.Turn==sampledPerFrame.Turn,new{spikes=sampledPerFrame.TotalSpikes,flight=sampledPerFrame.Flight,olfactory=sampledPerFrame.OlfactoryRate,navigation=sampledPerFrame.NavigationRate});
+        (double wallSeconds,long spikes) MeasureState(bool sugar)
+        {
+            var state=Make(new(){RestEnabled=false,HungerPerMinute=0,FlightFullnessCostPerSecond=0});state.Fullness=5;
+            if(sugar)state.AddSugar(new(area.Right-80,area.Bottom-80));
+            Advance(state,1);long before=state.Brain.TotalSpikes;var stateWatch=Stopwatch.StartNew();Advance(state,6);stateWatch.Stop();
+            return(stateWatch.Elapsed.TotalSeconds,state.Brain.TotalSpikes-before);
+        }
+        var hungryState=MeasureState(false);var sugarState=MeasureState(true);
+        Check("hungry_and_sugar_states_stay_within_compute_budget",hungryState.wallSeconds<6&&sugarState.wallSeconds<6,new{simulatedSeconds=6,hungryWallSeconds=hungryState.wallSeconds,hungrySpikes=hungryState.spikes,sugarWallSeconds=sugarState.wallSeconds,sugarSpikes=sugarState.spikes});
         var bench=Make();Advance(bench,2);var watch=Stopwatch.StartNew();Advance(bench,30);watch.Stop();
         Check("neural_simulation_faster_than_realtime",watch.Elapsed.TotalSeconds<30,new{simulatedSeconds=30,wallSeconds=watch.Elapsed.TotalSeconds,realtimeFactor=30/watch.Elapsed.TotalSeconds,processor=Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER")});
         using var renderer=new FlyRenderer();using var image=new Bitmap(1200,780);image.SetResolution(96,96);using var g=Graphics.FromImage(image);

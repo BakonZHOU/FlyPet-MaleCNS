@@ -1,7 +1,7 @@
 param(
     [ValidateSet('windows-x64','windows-arm64')]
     [string]$Target = 'windows-x64',
-    [string]$Version = '1.1.11'
+    [string]$Version = '1.1.13'
 )
 $ErrorActionPreference = 'Stop'
 $runtime = if ($Target -eq 'windows-arm64') { 'win-arm64' } else { 'win-x64' }

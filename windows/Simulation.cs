@@ -251,7 +251,8 @@ public sealed class Simulation
         Brain.SetInput(Math.Max(threat,Alarm*.95f+InjuryArousal*.13f),contact?1:0,Fullness,Math.Clamp(threat>.02f?escapeTurn:delta,-1,1),travel,wall,Settings,
             odorStrength,Math.Clamp(odorTurn,-1,1),Math.Clamp(wallTurn,-1,1),px,py,rewardPulse,punishmentPulse+edgeShock,dt,memoryRadiusX,memoryRadiusY,false,avoidanceRewardPulse);
         neuralRemainder+=dt;
-        while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain);neuralRemainder-=.001f;}
+        while(neuralRemainder>=.001f){Brain.Step(Settings.NeuralGain,false);neuralRemainder-=.001f;}
+        Brain.SampleOutputs(Settings.NeuralGain);
         if(burstCooldown<=0&&burstRemaining<=0&&!resting&&!contact&&Brain.Flight>.25f&&random.NextDouble()<dt*.65){burstRemaining=.20f+(float)random.NextDouble()*.22f;burstCooldown=1.5f+(float)random.NextDouble()*2.5f;}
         float steeringIntent=threat>.02f?escapeTurn:delta;
         float learnedTurnGain=3.6f+LearnedEdgeRisk*(5.5f+Brain.AvoidanceSkill*5.5f);
