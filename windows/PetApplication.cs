@@ -52,6 +52,7 @@ public sealed class PetApplication : ApplicationContext
     readonly LocalControl localControl;
     VoiceAssistant? voiceAssistant;
     FileSearchWindow? fileSearchWindow;
+    bool voiceAwaiting;
     readonly System.Windows.Forms.Timer timer=new();
     readonly Stopwatch clock=Stopwatch.StartNew();
     double previous,accumulator,statsPrevious,simulatedWindow,drawElapsed,nextStatusSave;
@@ -192,8 +193,9 @@ public sealed class PetApplication : ApplicationContext
     {
         voiceAssistant?.Dispose();voiceAssistant=null;
         if(!Settings.VoiceEnabled)return;
-        voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent);voiceAssistant.Start();
+        voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent,SetVoiceAwaiting);voiceAssistant.Start();
     }
+    void SetVoiceAwaiting(bool awaiting)=>Defer(()=>{voiceAwaiting=awaiting;if(awaiting){Sim.AttendToVoice(Area,5);StartPet();}else speech.Hide();});
     void PostVoiceStatus(string message)=>Defer(()=>tray.ShowBalloonTip(3500,"FlyPet · 本地语音",message,ToolTipIcon.Info));
     void HandleVoiceIntent(VoiceIntent command)=>Defer(() =>
     {
@@ -345,12 +347,12 @@ public sealed class PetApplication : ApplicationContext
             bool uiOpen=tray.ContextMenuStrip?.Visible==true||dashboard.Visible||settingsWindow?.Visible==true||evidenceWindow?.Visible==true||brainMap?.Visible==true||deathMenu?.Visible==true;
             if(!uiOpen)pet.BringToFront();
         }
-        if(Settings.Skin==PetSkin.Cockroach&&!Sim.Dead&&Sim.SpeechRemaining>0)
+        if((voiceAwaiting||Settings.Skin==PetSkin.Cockroach&&!Sim.Dead&&Sim.SpeechRemaining>0))
         {
             if(!speech.Visible)speech.Show();
             int x=Math.Clamp((int)Sim.Position.X+size/4,Area.Left+4,Math.Max(Area.Left+4,Area.Right-344));
             int y=Math.Clamp((int)Sim.Position.Y-size/2-64,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-62));
-            speech.Render(x,y,340,58,FlyRenderer.DrawSpeechBubble);
+            speech.Render(x,y,340,58,g=>{FlyRenderer.DrawSpeechBubble(g);if(voiceAwaiting){using var font=Theme.Font(25,FontStyle.Bold);using var brush=new SolidBrush(Theme.Bg);g.DrawString("?",font,brush,156,12);}});
             speech.BringToFront();
         }
         else speech.Hide();

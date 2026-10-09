@@ -9,15 +9,17 @@ public sealed class VoiceAssistant : IDisposable
     readonly string modelPath;
     readonly Action<string> status;
     readonly Action<VoiceIntent> intent;
+    readonly Action<bool> listening;
     readonly CancellationTokenSource cancellation=new();
     WaveInEvent? microphone;
     Model? model;
     VoskRecognizer? recognizer;
     DateTime commandDeadline=DateTime.MinValue;
     bool disposed;
+    System.Threading.Timer? timeout;
 
-    public VoiceAssistant(string modelPath,Action<string> status,Action<VoiceIntent> intent)
-    {this.modelPath=modelPath;this.status=status;this.intent=intent;}
+    public VoiceAssistant(string modelPath,Action<string> status,Action<VoiceIntent> intent,Action<bool> listening)
+    {this.modelPath=modelPath;this.status=status;this.intent=intent;this.listening=listening;}
 
     public void Start()=>_ = Task.Run(Initialize);
 
@@ -57,7 +59,7 @@ public sealed class VoiceAssistant : IDisposable
         var now=DateTime.UtcNow;
         if(VoiceCommandParser.TrySplitWakeWord(text,out var inline))
         {
-            commandDeadline=now.AddSeconds(6);status("已唤醒，等待“搜索文件…”或“打开…”。");
+            commandDeadline=now.AddSeconds(5);timeout?.Dispose();timeout=new System.Threading.Timer(_=>CancelCommandWindow(),null,TimeSpan.FromSeconds(5),Timeout.InfiniteTimeSpan);listening(true);status("已唤醒，等待“搜索文件…”或“打开…”。");
             if(!string.IsNullOrWhiteSpace(inline))Dispatch(inline);
             return;
         }
@@ -68,12 +70,15 @@ public sealed class VoiceAssistant : IDisposable
     {
         var parsed=VoiceCommandParser.Parse(text);
         if(parsed==null){status("没有听懂指令。可以说“搜索文件 xxx”或“打开微信”。");return;}
-        commandDeadline=DateTime.MinValue;intent(parsed);
+        CloseCommandWindow();intent(parsed);
     }
+
+    void CancelCommandWindow(){if(commandDeadline==DateTime.MinValue)return;CloseCommandWindow();status("5 秒内未收到指令，已取消聆听。");}
+    void CloseCommandWindow(){commandDeadline=DateTime.MinValue;timeout?.Dispose();timeout=null;listening(false);}
 
     public void Dispose()
     {
-        if(disposed)return;disposed=true;cancellation.Cancel();
+        if(disposed)return;disposed=true;CloseCommandWindow();cancellation.Cancel();
         if(microphone!=null){microphone.DataAvailable-=OnAudio;try{microphone.StopRecording();}catch{}microphone.Dispose();}
         recognizer?.Dispose();model?.Dispose();cancellation.Dispose();
     }

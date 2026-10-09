@@ -31,6 +31,7 @@ public sealed class Simulation
     public bool CockroachFlying {get;private set;}
     public DeathCause CauseOfDeath {get;private set;}
     public float SpeechRemaining {get;private set;}
+    public float VoiceAttentionRemaining {get;private set;}
     float speechDelay=6;
     public float EscapeUrgency {get;private set;}
     public float EscapeDistanceRate {get;private set;}
@@ -61,6 +62,12 @@ public sealed class Simulation
     public Simulation(Settings settings,CircuitData data,int seed=0){Settings=settings;Brain=new(data);random=seed==0?new Random():new Random(seed);RollSkin();Health=MaxHealth;}
     public void Recenter(Rectangle area){Position=new(area.Left+area.Width*.55f,area.Top+area.Height*.45f);wander=Position;Velocity=Vector2.Zero;Defense=DefenseMove.None;DefenseRemaining=0;InvulnerabilityRemaining=0;}
     public void AddSugar(Vector2 p){if(Sugars.Count>=Settings.MaxSugar)Sugars.RemoveAt(0);Sugars.Add(new(p));}
+    public void AttendToVoice(Rectangle area,float seconds)
+    {
+        if(Dead)return;var center=new Vector2(area.Left+area.Width*.5f,area.Top+area.Height*.5f);var direction=center-Position;
+        if(direction.LengthSquared()>.01f)Heading=MathF.Atan2(direction.Y,direction.X)+MathF.PI/2;
+        VoiceAttentionRemaining=Math.Max(VoiceAttentionRemaining,seconds);Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";
+    }
     public bool Hit(Vector2 point,bool allowDefense=true)
     {
         if(Dead||Vector2.Distance(point,Position)>HitRadius)return false;
@@ -117,6 +124,10 @@ public sealed class Simulation
         Time+=dt;InvulnerabilityRemaining=Math.Max(0,InvulnerabilityRemaining-dt);HitFlash=Math.Max(0,HitFlash-dt);hitCooldown=Math.Max(0,hitCooldown-dt);burstRemaining=Math.Max(0,burstRemaining-dt);burstCooldown-=dt;rapidTurnRemaining=Math.Max(0,rapidTurnRemaining-dt);rapidTurnCooldown=Math.Max(0,rapidTurnCooldown-dt);
         edgeShock=Math.Max(0,edgeShock-dt*2.5f);rewardPulse=Math.Max(0,rewardPulse-dt*.7f);punishmentPulse=Math.Max(0,punishmentPulse-dt*1.2f);avoidanceRewardPulse=Math.Max(0,avoidanceRewardPulse-dt*2.2f);avoidanceSuccessRemaining=Math.Max(0,avoidanceSuccessRemaining-dt);
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
+        if(VoiceAttentionRemaining>0)
+        {
+            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
+        }
         if(DefenseRemaining>0)
         {
             DefenseRemaining=Math.Max(0,DefenseRemaining-dt);
