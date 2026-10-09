@@ -19,6 +19,10 @@ static class SelfTest
         bool wakeInline=VoiceCommandParser.TrySplitWakeWord("蝇蝇 打开 微信",out var inline);
         var parsedSearch=VoiceCommandParser.Parse("搜索文件 毕业论文.pdf");var parsedLaunch=VoiceCommandParser.Parse(inline);
         Check("offline_voice_command_parser",wakeInline&&inline=="打开微信"&&parsedSearch==new VoiceIntent(VoiceIntentKind.SearchFiles,"毕业论文pdf")&&parsedLaunch==new VoiceIntent(VoiceIntentKind.LaunchApp,"微信"),new{wakeInline,inline,parsedSearch,parsedLaunch});
+        bool wakePinyin=VoiceCommandParser.TrySplitWakeWord("yinyin 帮我搜索机器学习好吗",out var pinyinInline);
+        Check("voice_wake_variants_and_filler_filter",wakePinyin&&VoiceCommandParser.Parse(pinyinInline)==new VoiceIntent(VoiceIntentKind.SearchFiles,"机器学习"),new{wakePinyin,pinyinInline,parsed=VoiceCommandParser.Parse(pinyinInline)});
+        var attentive=Make();attentive.Position=new(area.Left+100,area.Top+area.Height*.5f);attentive.Heading=0;attentive.AttendToVoice(area,3);Advance(attentive,.15f);float midwayHeading=attentive.Heading;Advance(attentive,.16f);
+        Check("voice_attention_turns_smoothly_in_three_tenths",midwayHeading>.35f&&midwayHeading<1.25f&&Math.Abs(attentive.Heading-MathF.PI/2)<.08f,new{midwayHeading,finalHeading=attentive.Heading});
         var fullStart=Make();var immortal=Make(new(){Invincible=true});immortal.Fullness=12;Advance(immortal,4);
         Check("fullness_starts_full_and_invincible_stays_full",fullStart.Fullness==100&&immortal.Fullness==100,new{initial=fullStart.Fullness,invincible=immortal.Fullness});
         using(var sound=new AbilitySound()){sound.StressVoicesForTest(64);Thread.Sleep(250);Check("ability_sounds_concurrent_native_buffers",true);}
@@ -243,6 +247,8 @@ static class SelfTest
         }
         using(var bubbleImage=new Bitmap(340,58))using(var bg=Graphics.FromImage(bubbleImage))
         {bg.Clear(Color.Transparent);FlyRenderer.DrawSpeechBubble(bg);bubbleImage.Save(Path.Combine(output,"speech-bubble.png"),ImageFormat.Png);}
+        using(var questionImage=new Bitmap(76,54))using(var qg=Graphics.FromImage(questionImage))
+        {qg.Clear(Color.Transparent);FlyRenderer.DrawQuestionBubble(qg,76,54);questionImage.Save(Path.Combine(output,"question-bubble.png"),ImageFormat.Png);}
         using(var roachImage=new Bitmap(1000,800))using(var rg=Graphics.FromImage(roachImage))
         {
             using var roachTitle=Theme.Font(17);rg.Clear(Theme.Bg);rg.DrawString("FLYPET / 广东双马尾 · 奔跑与飞行",roachTitle,titleBrush,24,18);

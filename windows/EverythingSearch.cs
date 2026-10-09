@@ -20,11 +20,15 @@ public static class EverythingSearch
         Process? running=null;
         try
         {
-            running=Process.GetProcessesByName("Everything").FirstOrDefault();
-            string? executable=running?.MainModule?.FileName;
+            running=Process.GetProcessesByName("Everything").OrderByDescending(process=>process.MainWindowHandle!=0).FirstOrDefault();
+            string? executable=null;
+            try{executable=running?.MainModule?.FileName;}catch(System.ComponentModel.Win32Exception){}
             if(string.IsNullOrWhiteSpace(executable)||!File.Exists(executable))executable=EverythingCandidates().FirstOrDefault(File.Exists);
             if(string.IsNullOrWhiteSpace(executable))return false;
-            var start=new ProcessStartInfo(executable){UseShellExecute=true};start.ArgumentList.Add("-search");start.ArgumentList.Add(query);Process.Start(start);return true;
+            string escaped=query.Replace("\"","\"\"\"");
+            Process.Start(new ProcessStartInfo(executable,$"-search \"{escaped}\""){UseShellExecute=true});
+            if(running?.MainWindowHandle is nint handle&&handle!=0){Native.ShowWindow(handle,9);Native.SetForegroundWindow(handle);}
+            return true;
         }
         catch(InvalidOperationException){return false;}
         catch(System.ComponentModel.Win32Exception){return false;}

@@ -51,7 +51,6 @@ public sealed class PetApplication : ApplicationContext
     readonly MouseHook mouseHook;
     readonly LocalControl localControl;
     VoiceAssistant? voiceAssistant;
-    FileSearchWindow? fileSearchWindow;
     bool voiceAwaiting;
     readonly System.Windows.Forms.Timer timer=new();
     readonly Stopwatch clock=Stopwatch.StartNew();
@@ -208,7 +207,7 @@ public sealed class PetApplication : ApplicationContext
         switch(command.Kind)
         {
             case VoiceIntentKind.SearchFiles:
-                if(!EverythingSearch.TryOpenUi(command.Value)){fileSearchWindow??=new FileSearchWindow();fileSearchWindow.Search(command.Value,Settings.VoiceSearchFolders);}break;
+                if(!EverythingSearch.TryOpenUi(command.Value))PostVoiceStatus("无法打开 Everything；请确认 Everything 已安装并正在运行。");break;
             case VoiceIntentKind.LaunchApp:
                 if(LocalAppLauncher.TryLaunch(command.Value,out var detail))PostVoiceStatus("已打开："+detail);
                 else PostVoiceStatus(detail);
@@ -246,7 +245,8 @@ public sealed class PetApplication : ApplicationContext
     }
     bool OnRightMouseDown(Point p)
     {
-        if(Mode!=ToolMode.Sugar)return false;
+        if(Mode!=ToolMode.Sugar||!visible||!Area.Contains(p)||tray.ContextMenuStrip?.Visible==true)return false;
+        if((dashboard.Visible&&dashboard.Bounds.Contains(p))||(settingsWindow?.Visible==true&&settingsWindow.Bounds.Contains(p))||(evidenceWindow?.Visible==true&&evidenceWindow.Bounds.Contains(p))||(brainMap?.Visible==true&&brainMap.Bounds.Contains(p)))return false;
         pendingSugarCancel=true;return true;
     }
     void OnLeftMouseUp(Point p)
@@ -356,10 +356,10 @@ public sealed class PetApplication : ApplicationContext
         if((voiceAwaiting||Settings.Skin==PetSkin.Cockroach&&!Sim.Dead&&Sim.SpeechRemaining>0))
         {
             if(!speech.Visible)speech.Show();
-            int bubbleWidth=voiceAwaiting?76:340,bubbleHeight=voiceAwaiting?48:58;
+            int bubbleWidth=voiceAwaiting?Math.Clamp((int)(size*.72f),58,96):340,bubbleHeight=voiceAwaiting?Math.Clamp((int)(size*.46f),42,61):58;
             int x=Math.Clamp((int)Sim.Position.X-bubbleWidth/2,Area.Left+4,Math.Max(Area.Left+4,Area.Right-bubbleWidth-4));
             int y=Math.Clamp((int)Sim.Position.Y-size/2-bubbleHeight-8,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-bubbleHeight-4));
-            speech.Render(x,y,bubbleWidth,bubbleHeight,g=>{if(voiceAwaiting)FlyRenderer.DrawQuestionBubble(g);else FlyRenderer.DrawSpeechBubble(g);});
+            speech.Render(x,y,bubbleWidth,bubbleHeight,g=>{if(voiceAwaiting)FlyRenderer.DrawQuestionBubble(g,bubbleWidth,bubbleHeight);else FlyRenderer.DrawSpeechBubble(g);});
             speech.BringToFront();
         }
         else speech.Hide();
@@ -426,7 +426,7 @@ public sealed class PetApplication : ApplicationContext
     protected override void ExitThreadCore()
     {
         if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
-        voiceAssistant?.Dispose();fileSearchWindow?.Dispose();settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();ClearGhosts();abilitySound.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
+        voiceAssistant?.Dispose();settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();ClearGhosts();abilitySound.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
 

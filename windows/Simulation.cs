@@ -33,6 +33,7 @@ public sealed class Simulation
     public float SpeechRemaining {get;private set;}
     public float VoiceAttentionRemaining {get;private set;}
     float voiceAttentionHeading;
+    float voiceTurnRemaining;
     float speechDelay=6;
     public float EscapeUrgency {get;private set;}
     public float EscapeDistanceRate {get;private set;}
@@ -72,6 +73,7 @@ public sealed class Simulation
     {
         if(Dead)return;var center=new Vector2(area.Left+area.Width*.5f,area.Top+area.Height*.5f);var direction=center-Position;
         if(direction.LengthSquared()>.01f)voiceAttentionHeading=MathF.Atan2(direction.Y,direction.X)+MathF.PI/2;
+        voiceTurnRemaining=.3f;
         VoiceAttentionRemaining=Math.Max(VoiceAttentionRemaining,seconds);Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";
     }
     int EdgeSegmentAt(Vector2 point,Rectangle area)
@@ -148,7 +150,9 @@ public sealed class Simulation
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         if(VoiceAttentionRemaining>0)
         {
-            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);float attentionDelta=Wrap(voiceAttentionHeading-Heading);Heading=Wrap(Heading+Math.Clamp(attentionDelta,-1.35f*dt,1.35f*dt));Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
+            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);
+            if(voiceTurnRemaining>0){float attentionDelta=Wrap(voiceAttentionHeading-Heading);float turnStep=voiceTurnRemaining<=dt?attentionDelta:attentionDelta*dt/voiceTurnRemaining;Heading=Wrap(Heading+turnStep);voiceTurnRemaining=Math.Max(0,voiceTurnRemaining-dt);}
+            Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
         }
         if(DefenseRemaining>0)
         {

@@ -16,6 +16,7 @@ public sealed class VoiceAssistant : IDisposable
     Model? model;
     VoskRecognizer? recognizer;
     DateTime commandDeadline=DateTime.MinValue;
+    VoiceIntentKind? pendingIntent;
     bool disposed;
     System.Threading.Timer? timeout;
 
@@ -67,7 +68,7 @@ public sealed class VoiceAssistant : IDisposable
         var now=DateTime.UtcNow;
         if(VoiceCommandParser.TrySplitWakeWord(text,out var inline))
         {
-            OpenCommandWindow();
+            if(commandDeadline==DateTime.MinValue)OpenCommandWindow();
             if(!string.IsNullOrWhiteSpace(inline))Dispatch(inline);
             return;
         }
@@ -81,13 +82,27 @@ public sealed class VoiceAssistant : IDisposable
 
     void Dispatch(string text)
     {
+        if(pendingIntent is VoiceIntentKind pending)
+        {
+            string value=VoiceCommandParser.CleanArgument(text);
+            if(!string.IsNullOrWhiteSpace(value)){CloseCommandWindow();intent(new VoiceIntent(pending,value));return;}
+        }
         var parsed=VoiceCommandParser.Parse(text);
-        if(parsed==null){status("没有听懂指令。可以说“搜索文件 xxx”或“打开微信”。");return;}
+        if(parsed==null)
+        {
+            if(VoiceCommandParser.IsBareSearchCommand(text)){pendingIntent=VoiceIntentKind.SearchFiles;RefreshCommandWindow();return;}
+            status("没有听懂指令。可以说“搜索文件 xxx”或“打开微信”。");return;
+        }
         CloseCommandWindow();intent(parsed);
     }
 
-    void CancelCommandWindow(){if(commandDeadline==DateTime.MinValue)return;CloseCommandWindow();status("5 秒内未收到指令，已取消聆听。");}
-    void CloseCommandWindow(){commandDeadline=DateTime.MinValue;timeout?.Dispose();timeout=null;listening(false);}
+    void RefreshCommandWindow()
+    {
+        commandDeadline=DateTime.UtcNow.AddSeconds(commandTimeoutSeconds);timeout?.Dispose();timeout=new System.Threading.Timer(_=>CancelCommandWindow(),null,TimeSpan.FromSeconds(commandTimeoutSeconds),Timeout.InfiniteTimeSpan);
+    }
+
+    void CancelCommandWindow(){if(commandDeadline==DateTime.MinValue)return;CloseCommandWindow();status($"{commandTimeoutSeconds} 秒内未收到指令，已取消聆听。");}
+    void CloseCommandWindow(){commandDeadline=DateTime.MinValue;pendingIntent=null;timeout?.Dispose();timeout=null;listening(false);}
 
     public void Dispose()
     {

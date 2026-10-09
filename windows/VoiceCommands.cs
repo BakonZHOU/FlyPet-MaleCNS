@@ -35,11 +35,25 @@ public static class VoiceCommandParser
         return null;
     }
 
+    public static bool IsBareSearchCommand(string text)=>SearchPrefixes.Contains(Normalize(text),StringComparer.Ordinal);
+    public static string CleanArgument(string text)
+    {
+        string value=Normalize(text);
+        foreach(var prefix in new[]{"我要搜索","我要找","帮我搜索","帮我找","搜索文件","查找文件","搜索","查找","找一下"})if(value.StartsWith(prefix,StringComparison.Ordinal)){value=value[prefix.Length..];break;}
+        return CleanValue(value);
+    }
+
     static VoiceIntent? Create(VoiceIntentKind kind,string value)
+    {
+        value=CleanValue(value);
+        return string.IsNullOrWhiteSpace(value)?null:new(kind,value);
+    }
+
+    static string CleanValue(string value)
     {
         value=value.Trim('的','吧','。','！','？','，',',',' ');
         foreach(var suffix in new[]{"一下","好吗","好不好","可以吗","谢谢","呀","啊","喔"})if(value.EndsWith(suffix,StringComparison.Ordinal))value=value[..^suffix.Length];
-        return string.IsNullOrWhiteSpace(value)?null:new(kind,value);
+        return value;
     }
 
     public static string Normalize(string value)=>string.Concat(value.Where(c=>!char.IsWhiteSpace(c)&&!char.IsPunctuation(c))).ToLowerInvariant();

@@ -276,11 +276,12 @@ public sealed class FlyRenderer : IDisposable
         using var font=new Font("Microsoft YaHei UI",11,FontStyle.Bold);using var ink=new SolidBrush(Color.FromArgb(238,228,206));
         if(greeting)g.DrawString("Ciallo～(∠・ω< )⌒★",font,ink,13,14);
     }
-    public static void DrawQuestionBubble(Graphics g)
+    public static void DrawQuestionBubble(Graphics g,int width=76,int height=48)
     {
-        g.SmoothingMode=SmoothingMode.AntiAlias;using var fill=new SolidBrush(Color.FromArgb(236,29,33,29));using var border=new Pen(Color.FromArgb(185,204,204,204),1.3f);
-        using var shape=new GraphicsPath();shape.AddArc(2,2,13,13,180,90);shape.AddArc(61,2,13,13,270,90);shape.AddArc(61,33,13,13,0,90);shape.AddLine(43,46,37,51);shape.AddLine(37,51,31,46);shape.AddArc(2,33,13,13,90,90);shape.CloseFigure();g.FillPath(fill,shape);g.DrawPath(border,shape);
-        using var font=new Font("Microsoft YaHei UI",17,FontStyle.Bold);using var ink=new SolidBrush(Color.White);var text=g.MeasureString("?",font);g.DrawString("?",font,ink,(76-text.Width)/2,9);
+        g.SmoothingMode=SmoothingMode.AntiAlias;using var fill=new SolidBrush(Color.FromArgb(239,28,32,27));using var border=new Pen(Color.FromArgb(212,190,151,95),Math.Max(1.25f,width/170f*2));
+        float margin=2,radius=Math.Clamp(height*.28f,10,16),bottom=height-7,right=width-margin,tailCenter=width*.5f;
+        using var shape=new GraphicsPath();shape.AddArc(margin,margin,radius,radius,180,90);shape.AddArc(right-radius,margin,radius,radius,270,90);shape.AddArc(right-radius,bottom-radius,radius,radius,0,90);shape.AddLine(tailCenter+7,bottom,tailCenter,bottom+6);shape.AddLine(tailCenter,bottom+6,tailCenter-7,bottom);shape.AddArc(margin,bottom-radius,radius,radius,90,90);shape.CloseFigure();g.FillPath(fill,shape);g.DrawPath(border,shape);
+        using var glyph=new GraphicsPath();using var family=new FontFamily("Microsoft YaHei UI");float em=Math.Clamp(height*.43f,16,25);glyph.AddString("?",family,(int)FontStyle.Bold,em,new PointF(0,0),StringFormat.GenericTypographic);var bounds=glyph.GetBounds();using var transform=new Matrix();transform.Translate((width-bounds.Width)/2-bounds.X,(bottom-bounds.Height)/2-bounds.Y+.5f);glyph.Transform(transform);using var ink=new SolidBrush(Color.White);g.FillPath(ink,glyph);
     }
     static void DrawEgg(Graphics g)
     {
