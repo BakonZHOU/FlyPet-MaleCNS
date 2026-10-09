@@ -279,7 +279,6 @@ public sealed class Brain
         // Pairing place-cell activity with aversive DAN input strengthens the
         // learned edge-to-navigation pathway. It changes future neural drive;
         // it does not directly rotate or teleport the body.
-        AvoidanceSkill=Math.Clamp(AvoidanceSkill+(.25f+strength*.35f)*(1-AvoidanceSkill),0,1);
         UpdateRememberedPlace();UpdateLocalAvoidance(positionX,positionY,radiusX,radiusY);
     }
     public void ReinforceSuccessfulAvoidance(float strength)
@@ -287,6 +286,7 @@ public sealed class Brain
         strength=Math.Clamp(strength,0,1);
         AvoidanceSkill=Math.Clamp(AvoidanceSkill+strength*.10f*(1-AvoidanceSkill),0,1);
     }
+    public void SetAvoidanceSkill(float value)=>AvoidanceSkill=Math.Clamp(value,0,1);
     public void SenseLocation(float positionX,float positionY,float radiusX,float radiusY)=>UpdateLocalAvoidance(positionX,positionY,radiusX,radiusY);
     public float[] ExportMemory()=>(float[])placeValue.Clone();
     public void ImportMemory(float[] values)

@@ -77,7 +77,7 @@ public sealed class Dashboard : Form
     public void RefreshStatus()
     {
         var s=app.Sim;status.Text=s.Dead?$"等待复活 · {s.DeathRemaining:0} 秒":app.BehaviorLabel;
-        metrics.Text=$"生命 {s.Health/s.MaxHealth*100:0}%   饱腹 {s.Fullness:0}%   {s.DisplaySize} px\n边缘经验 {s.Brain.AvoidanceSkill*100:0}%   成功避开 {s.SuccessfulEdgeAvoidances}   撞击 {s.EdgeCollisions}";preview.Invalidate();
+        metrics.Text=$"生命 {s.Health/s.MaxHealth*100:0}%   饱腹 {s.Fullness:0}%   {s.DisplaySize} px\n边缘经验 {s.EdgeExperience*100:0}%   覆盖 {s.EdgeCoverage*100:0}%   成功避开 {s.SuccessfulEdgeAvoidances}   撞击 {s.EdgeCollisions}";preview.Invalidate();
     }
     public void Shutdown(){exiting=true;Close();}
 }
