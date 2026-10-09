@@ -88,6 +88,8 @@ public sealed class PetApplication : ApplicationContext
         flySkinItem.Click+=(_,_)=>SelectSkin(PetSkin.Fly);roachSkinItem.Click+=(_,_)=>SelectSkin(PetSkin.Cockroach);
         skins.DropDownItems.Add(flySkinItem);skins.DropDownItems.Add(roachSkinItem);
         menu.Items.Add("暂停 / 继续",null,(_,_)=>TogglePause());
+        var voiceItem=new ToolStripMenuItem("本地语音控制"){Checked=Settings.VoiceEnabled,CheckOnClick=true};
+        voiceItem.CheckedChanged+=(_,_)=>{Settings.VoiceEnabled=voiceItem.Checked;Settings.Save();UpdateVoiceAssistant();};menu.Items.Add(voiceItem);
         menu.Items.Add(new ToolStripSeparator());
         var more=new ToolStripMenuItem("更多操作");menu.Items.Add(more);
         var meterItem=new ToolStripMenuItem("显示状态条"){Checked=Settings.ShowMeters,CheckOnClick=true};meterItem.CheckedChanged+=(_,_)=>{Settings.ShowMeters=meterItem.Checked;Settings.Save();};menu.Items.Add(meterItem);
@@ -196,7 +198,11 @@ public sealed class PetApplication : ApplicationContext
         voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent,SetVoiceAwaiting);voiceAssistant.Start();
     }
     void SetVoiceAwaiting(bool awaiting)=>Defer(()=>{voiceAwaiting=awaiting;if(awaiting){Sim.AttendToVoice(Area,5);StartPet();}else speech.Hide();});
-    void PostVoiceStatus(string message)=>Defer(()=>tray.ShowBalloonTip(3500,"FlyPet · 本地语音",message,ToolTipIcon.Info));
+    void PostVoiceStatus(string message)
+    {
+        if(!message.StartsWith("无法",StringComparison.Ordinal)&&!message.StartsWith("本地语音模型",StringComparison.Ordinal)&&!message.StartsWith("麦克风",StringComparison.Ordinal)&&!message.StartsWith("语音识别已暂停",StringComparison.Ordinal))return;
+        Defer(()=>tray.ShowBalloonTip(3500,"FlyPet · 本地语音",message,ToolTipIcon.Warning));
+    }
     void HandleVoiceIntent(VoiceIntent command)=>Defer(() =>
     {
         switch(command.Kind)
@@ -352,7 +358,7 @@ public sealed class PetApplication : ApplicationContext
             if(!speech.Visible)speech.Show();
             int x=Math.Clamp((int)Sim.Position.X+size/4,Area.Left+4,Math.Max(Area.Left+4,Area.Right-344));
             int y=Math.Clamp((int)Sim.Position.Y-size/2-64,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-62));
-            speech.Render(x,y,340,58,g=>{FlyRenderer.DrawSpeechBubble(g);if(voiceAwaiting){using var font=Theme.Font(25,FontStyle.Bold);using var brush=new SolidBrush(Theme.Bg);g.DrawString("?",font,brush,156,12);}});
+            speech.Render(x,y,340,58,g=>{FlyRenderer.DrawSpeechBubble(g,!voiceAwaiting);if(voiceAwaiting){using var font=Theme.Font(25,FontStyle.Bold);using var brush=new SolidBrush(Theme.Bg);g.DrawString("?",font,brush,156,12);}});
             speech.BringToFront();
         }
         else speech.Hide();

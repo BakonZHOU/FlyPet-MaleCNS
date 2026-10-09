@@ -264,7 +264,7 @@ public sealed class FlyRenderer : IDisposable
         using var grain=new SolidBrush(Color.FromArgb(183,175,129));for(int i=0;i<8;i++)g.FillRectangle(grain,15+i*7%15,19+i*5%11,2,2);
         using var bar=new SolidBrush(Color.FromArgb(189,203,142));g.FillRectangle(bar,11,41,26*amount/100,2);g.ResetTransform();
     }
-    public static void DrawSpeechBubble(Graphics g)
+    public static void DrawSpeechBubble(Graphics g,bool greeting=true)
     {
         g.SmoothingMode=SmoothingMode.AntiAlias;
         using var fill=new SolidBrush(Color.FromArgb(239,28,32,27));using var border=new Pen(Color.FromArgb(212,190,151,95),2);
@@ -274,7 +274,7 @@ public sealed class FlyRenderer : IDisposable
         shape.AddArc(2,34,16,16,90,90);shape.CloseFigure();
         g.FillPath(fill,shape);g.DrawPath(border,shape);
         using var font=new Font("Microsoft YaHei UI",11,FontStyle.Bold);using var ink=new SolidBrush(Color.FromArgb(238,228,206));
-        g.DrawString("Ciallo～(∠・ω< )⌒★",font,ink,13,14);
+        if(greeting)g.DrawString("Ciallo～(∠・ω< )⌒★",font,ink,13,14);
     }
     static void DrawEgg(Graphics g)
     {

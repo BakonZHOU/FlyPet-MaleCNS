@@ -32,6 +32,7 @@ public sealed class Simulation
     public DeathCause CauseOfDeath {get;private set;}
     public float SpeechRemaining {get;private set;}
     public float VoiceAttentionRemaining {get;private set;}
+    float voiceAttentionHeading;
     float speechDelay=6;
     public float EscapeUrgency {get;private set;}
     public float EscapeDistanceRate {get;private set;}
@@ -65,7 +66,7 @@ public sealed class Simulation
     public void AttendToVoice(Rectangle area,float seconds)
     {
         if(Dead)return;var center=new Vector2(area.Left+area.Width*.5f,area.Top+area.Height*.5f);var direction=center-Position;
-        if(direction.LengthSquared()>.01f)Heading=MathF.Atan2(direction.Y,direction.X)+MathF.PI/2;
+        if(direction.LengthSquared()>.01f)voiceAttentionHeading=MathF.Atan2(direction.Y,direction.X)+MathF.PI/2;
         VoiceAttentionRemaining=Math.Max(VoiceAttentionRemaining,seconds);Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";
     }
     public bool Hit(Vector2 point,bool allowDefense=true)
@@ -126,7 +127,7 @@ public sealed class Simulation
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         if(VoiceAttentionRemaining>0)
         {
-            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
+            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);float attentionDelta=Wrap(voiceAttentionHeading-Heading);Heading=Wrap(Heading+Math.Clamp(attentionDelta,-5.2f*dt,5.2f*dt));Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
         }
         if(DefenseRemaining>0)
         {

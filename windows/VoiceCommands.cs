@@ -74,13 +74,15 @@ public static class LocalFileSearch
 
 public static class LocalAppLauncher
 {
+    sealed record AppEntry(string Name,string Path);
+    static readonly Lazy<IReadOnlyList<AppEntry>> index=new(BuildIndex);
     public static bool TryLaunch(string name,out string detail)
     {
         string wanted=VoiceCommandParser.Normalize(name);
-        foreach(var shortcut in StartMenuShortcuts())
+        var found=index.Value.OrderBy(entry=>Score(entry.Name,wanted)).FirstOrDefault(entry=>Score(entry.Name,wanted)<3);
+        if(found!=null)
         {
-            if(!VoiceCommandParser.Normalize(Path.GetFileNameWithoutExtension(shortcut)).Contains(wanted,StringComparison.Ordinal))continue;
-            Process.Start(new ProcessStartInfo(shortcut){UseShellExecute=true});detail=Path.GetFileNameWithoutExtension(shortcut);return true;
+            Process.Start(new ProcessStartInfo(found.Path){UseShellExecute=true});detail=found.Name;return true;
         }
         if(wanted is "微信" or "weixin" or "wechat")
         {
@@ -90,18 +92,27 @@ public static class LocalAppLauncher
                 Process.Start(new ProcessStartInfo(path){UseShellExecute=true});detail="微信";return true;
             }
         }
-        detail="未在开始菜单或常见安装目录找到“"+name+"”";return false;
+        detail="未在桌面、开始菜单或常见安装目录找到“"+name+"”";return false;
     }
 
-    static IEnumerable<string> StartMenuShortcuts()
+    static int Score(string app,string wanted)
     {
-        var roots=new[]{Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu)};
+        string normalized=VoiceCommandParser.Normalize(app);
+        if(normalized==wanted)return 0;
+        if(normalized.StartsWith(wanted,StringComparison.Ordinal))return 1;
+        return normalized.Contains(wanted,StringComparison.Ordinal)?2:3;
+    }
+
+    static IReadOnlyList<AppEntry> BuildIndex()
+    {
+        var entries=new List<AppEntry>();var roots=new[]{Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.StartMenu),Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu)};
         foreach(var root in roots.Where(Directory.Exists))
         {
             IEnumerable<string> shortcuts=[];
-            try{shortcuts=Directory.EnumerateFiles(root,"*.lnk",SearchOption.AllDirectories);}catch(UnauthorizedAccessException){}
-            foreach(var shortcut in shortcuts)yield return shortcut;
+            try{shortcuts=Directory.EnumerateFiles(root,"*.lnk",new EnumerationOptions{RecurseSubdirectories=true,IgnoreInaccessible=true,AttributesToSkip=FileAttributes.ReparsePoint});}catch(UnauthorizedAccessException){}
+            try{entries.AddRange(shortcuts.Select(path=>new AppEntry(Path.GetFileNameWithoutExtension(path),path)));}catch(UnauthorizedAccessException){}
         }
+        return entries.DistinctBy(entry=>entry.Path,StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     static IEnumerable<string> WeChatCandidates()
