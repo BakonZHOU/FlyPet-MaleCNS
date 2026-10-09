@@ -8,7 +8,7 @@ public sealed record VoiceIntent(VoiceIntentKind Kind,string Value);
 
 public static class VoiceCommandParser
 {
-    static readonly string[] WakeWords=["强强","枪枪","蝇蝇","营营"];
+    static readonly string[] WakeWords=["强强","枪枪","蝇蝇","营营","阴阴","音音","英英","银银","赢赢","yingying","yinyin"];
     static readonly string[] SearchPrefixes=["搜索文件","查找文件","搜索","查找","找一下","找"];
     static readonly string[] LaunchPrefixes=["打开软件","启动软件","打开","启动"];
 
@@ -29,16 +29,16 @@ public static class VoiceCommandParser
     {
         text=Normalize(text);
         foreach(var prefix in SearchPrefixes)
-            if(text.StartsWith(prefix,StringComparison.Ordinal))return Create(VoiceIntentKind.SearchFiles,text[prefix.Length..]);
+        {int at=text.IndexOf(prefix,StringComparison.Ordinal);if(at>=0)return Create(VoiceIntentKind.SearchFiles,text[(at+prefix.Length)..]);}
         foreach(var prefix in LaunchPrefixes)
-            if(text.StartsWith(prefix,StringComparison.Ordinal))return Create(VoiceIntentKind.LaunchApp,text[prefix.Length..]);
+        {int at=text.IndexOf(prefix,StringComparison.Ordinal);if(at>=0)return Create(VoiceIntentKind.LaunchApp,text[(at+prefix.Length)..]);}
         return null;
     }
 
     static VoiceIntent? Create(VoiceIntentKind kind,string value)
     {
         value=value.Trim('的','吧','。','！','？','，',',',' ');
-        if(value.EndsWith("一下",StringComparison.Ordinal))value=value[..^2];
+        foreach(var suffix in new[]{"一下","好吗","好不好","可以吗","谢谢","呀","啊","喔"})if(value.EndsWith(suffix,StringComparison.Ordinal))value=value[..^suffix.Length];
         return string.IsNullOrWhiteSpace(value)?null:new(kind,value);
     }
 
@@ -79,6 +79,11 @@ public static class LocalAppLauncher
     public static bool TryLaunch(string name,out string detail)
     {
         string wanted=VoiceCommandParser.Normalize(name);
+        if(wanted is "浏览器" or "browser")
+        {Process.Start(new ProcessStartInfo("https://www.google.com/"){UseShellExecute=true});detail="默认浏览器";return true;}
+        if((wanted is "微信" or "weixin" or "wechat")&&TryActivateExisting(["WeChat","Weixin"],out detail))return true;
+        if(wanted is "音乐" or "am" or "applemusic")wanted="applemusic";
+        if(wanted is "gpt" or "chatgpt" or "openai")wanted="chatgpt";
         var found=index.Value.OrderBy(entry=>Score(entry.Name,wanted)).FirstOrDefault(entry=>Score(entry.Name,wanted)<3);
         if(found!=null)
         {
@@ -93,6 +98,20 @@ public static class LocalAppLauncher
             }
         }
         detail="未在桌面、开始菜单或常见安装目录找到“"+name+"”";return false;
+    }
+
+    static bool TryActivateExisting(IEnumerable<string> names,out string detail)
+    {
+        foreach(var process in Process.GetProcesses())
+        {
+            try
+            {
+                if(!names.Any(name=>process.ProcessName.StartsWith(name,StringComparison.OrdinalIgnoreCase))||process.MainWindowHandle==0)continue;
+                Native.ShowWindow(process.MainWindowHandle,9);Native.SetForegroundWindow(process.MainWindowHandle);detail="已切换到现有微信窗口";return true;
+            }
+            finally{process.Dispose();}
+        }
+        detail="";return false;
     }
 
     static int Score(string app,string wanted)

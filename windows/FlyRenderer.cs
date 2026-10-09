@@ -276,6 +276,12 @@ public sealed class FlyRenderer : IDisposable
         using var font=new Font("Microsoft YaHei UI",11,FontStyle.Bold);using var ink=new SolidBrush(Color.FromArgb(238,228,206));
         if(greeting)g.DrawString("Ciallo～(∠・ω< )⌒★",font,ink,13,14);
     }
+    public static void DrawQuestionBubble(Graphics g)
+    {
+        g.SmoothingMode=SmoothingMode.AntiAlias;using var fill=new SolidBrush(Color.FromArgb(236,29,33,29));using var border=new Pen(Color.FromArgb(185,204,204,204),1.3f);
+        using var shape=new GraphicsPath();shape.AddArc(2,2,13,13,180,90);shape.AddArc(61,2,13,13,270,90);shape.AddArc(61,33,13,13,0,90);shape.AddLine(43,46,37,51);shape.AddLine(37,51,31,46);shape.AddArc(2,33,13,13,90,90);shape.CloseFigure();g.FillPath(fill,shape);g.DrawPath(border,shape);
+        using var font=new Font("Microsoft YaHei UI",17,FontStyle.Bold);using var ink=new SolidBrush(Color.White);var text=g.MeasureString("?",font);g.DrawString("?",font,ink,(76-text.Width)/2,9);
+    }
     static void DrawEgg(Graphics g)
     {
         using var shadow=new SolidBrush(Color.FromArgb(43,24,18,12));g.FillEllipse(shadow,58,82,30,10);

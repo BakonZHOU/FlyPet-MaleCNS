@@ -195,9 +195,9 @@ public sealed class PetApplication : ApplicationContext
     {
         voiceAssistant?.Dispose();voiceAssistant=null;
         if(!Settings.VoiceEnabled)return;
-        voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent,SetVoiceAwaiting);voiceAssistant.Start();
+        voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent,SetVoiceAwaiting,Settings.VoiceCommandTimeoutSeconds);voiceAssistant.Start();
     }
-    void SetVoiceAwaiting(bool awaiting)=>Defer(()=>{voiceAwaiting=awaiting;if(awaiting){Sim.AttendToVoice(Area,5);StartPet();}else speech.Hide();});
+    void SetVoiceAwaiting(bool awaiting)=>Defer(()=>{voiceAwaiting=awaiting;if(awaiting){Sim.AttendToVoice(Area,Settings.VoiceCommandTimeoutSeconds);StartPet();}else speech.Hide();});
     void PostVoiceStatus(string message)
     {
         if(!message.StartsWith("无法",StringComparison.Ordinal)&&!message.StartsWith("本地语音模型",StringComparison.Ordinal)&&!message.StartsWith("麦克风",StringComparison.Ordinal)&&!message.StartsWith("语音识别已暂停",StringComparison.Ordinal))return;
@@ -208,7 +208,7 @@ public sealed class PetApplication : ApplicationContext
         switch(command.Kind)
         {
             case VoiceIntentKind.SearchFiles:
-                fileSearchWindow??=new FileSearchWindow();fileSearchWindow.Search(command.Value,Settings.VoiceSearchFolders);break;
+                if(!EverythingSearch.TryOpenUi(command.Value)){fileSearchWindow??=new FileSearchWindow();fileSearchWindow.Search(command.Value,Settings.VoiceSearchFolders);}break;
             case VoiceIntentKind.LaunchApp:
                 if(LocalAppLauncher.TryLaunch(command.Value,out var detail))PostVoiceStatus("已打开："+detail);
                 else PostVoiceStatus(detail);
@@ -356,9 +356,10 @@ public sealed class PetApplication : ApplicationContext
         if((voiceAwaiting||Settings.Skin==PetSkin.Cockroach&&!Sim.Dead&&Sim.SpeechRemaining>0))
         {
             if(!speech.Visible)speech.Show();
-            int x=Math.Clamp((int)Sim.Position.X+size/4,Area.Left+4,Math.Max(Area.Left+4,Area.Right-344));
-            int y=Math.Clamp((int)Sim.Position.Y-size/2-64,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-62));
-            speech.Render(x,y,340,58,g=>{FlyRenderer.DrawSpeechBubble(g,!voiceAwaiting);if(voiceAwaiting){using var font=Theme.Font(25,FontStyle.Bold);using var brush=new SolidBrush(Theme.Bg);g.DrawString("?",font,brush,156,12);}});
+            int bubbleWidth=voiceAwaiting?76:340,bubbleHeight=voiceAwaiting?48:58;
+            int x=Math.Clamp((int)Sim.Position.X-bubbleWidth/2,Area.Left+4,Math.Max(Area.Left+4,Area.Right-bubbleWidth-4));
+            int y=Math.Clamp((int)Sim.Position.Y-size/2-bubbleHeight-8,Area.Top+4,Math.Max(Area.Top+4,Area.Bottom-bubbleHeight-4));
+            speech.Render(x,y,bubbleWidth,bubbleHeight,g=>{if(voiceAwaiting)FlyRenderer.DrawQuestionBubble(g);else FlyRenderer.DrawSpeechBubble(g);});
             speech.BringToFront();
         }
         else speech.Hide();

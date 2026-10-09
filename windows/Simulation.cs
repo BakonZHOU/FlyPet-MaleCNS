@@ -127,7 +127,7 @@ public sealed class Simulation
         if(Dead){if(!RemainsVisible)return;DeathRemaining-=dt;if(DeathRemaining<=0)Revive(area);return;}
         if(VoiceAttentionRemaining>0)
         {
-            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);float attentionDelta=Wrap(voiceAttentionHeading-Heading);Heading=Wrap(Heading+Math.Clamp(attentionDelta,-5.2f*dt,5.2f*dt));Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
+            VoiceAttentionRemaining=Math.Max(0,VoiceAttentionRemaining-dt);float attentionDelta=Wrap(voiceAttentionHeading-Heading);Heading=Wrap(Heading+Math.Clamp(attentionDelta,-1.35f*dt,1.35f*dt));Velocity=Vector2.Zero;Grounded=true;CockroachFlying=false;Behavior="正在聆听";return;
         }
         if(DefenseRemaining>0)
         {

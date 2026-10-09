@@ -15,6 +15,29 @@ public static class EverythingSearch
     public static bool HasSdk=>File.Exists(LibraryPath);
     public static bool IsRunning=>Process.GetProcessesByName("Everything").Length>0;
 
+    public static bool TryOpenUi(string query)
+    {
+        Process? running=null;
+        try
+        {
+            running=Process.GetProcessesByName("Everything").FirstOrDefault();
+            string? executable=running?.MainModule?.FileName;
+            if(string.IsNullOrWhiteSpace(executable)||!File.Exists(executable))executable=EverythingCandidates().FirstOrDefault(File.Exists);
+            if(string.IsNullOrWhiteSpace(executable))return false;
+            var start=new ProcessStartInfo(executable){UseShellExecute=true};start.ArgumentList.Add("-search");start.ArgumentList.Add(query);Process.Start(start);return true;
+        }
+        catch(InvalidOperationException){return false;}
+        catch(System.ComponentModel.Win32Exception){return false;}
+        finally{running?.Dispose();}
+    }
+
+    static IEnumerable<string> EverythingCandidates()
+    {
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Everything","Everything.exe");
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),"Everything","Everything.exe");
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Everything","Everything.exe");
+    }
+
     public static bool TrySearch(string query,out IReadOnlyList<string> results,out string error)
     {
         results=[];error="";if(!HasSdk){error="Everything 查询组件尚未安装。";return false;}

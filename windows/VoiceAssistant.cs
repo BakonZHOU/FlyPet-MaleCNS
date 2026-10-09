@@ -10,6 +10,7 @@ public sealed class VoiceAssistant : IDisposable
     readonly Action<string> status;
     readonly Action<VoiceIntent> intent;
     readonly Action<bool> listening;
+    readonly int commandTimeoutSeconds;
     readonly CancellationTokenSource cancellation=new();
     WaveInEvent? microphone;
     Model? model;
@@ -18,8 +19,8 @@ public sealed class VoiceAssistant : IDisposable
     bool disposed;
     System.Threading.Timer? timeout;
 
-    public VoiceAssistant(string modelPath,Action<string> status,Action<VoiceIntent> intent,Action<bool> listening)
-    {this.modelPath=modelPath;this.status=status;this.intent=intent;this.listening=listening;}
+    public VoiceAssistant(string modelPath,Action<string> status,Action<VoiceIntent> intent,Action<bool> listening,int commandTimeoutSeconds)
+    {this.modelPath=modelPath;this.status=status;this.intent=intent;this.listening=listening;this.commandTimeoutSeconds=commandTimeoutSeconds;}
 
     public void Start()=>_ = Task.Run(Initialize);
 
@@ -45,12 +46,19 @@ public sealed class VoiceAssistant : IDisposable
         try
         {
             var current=recognizer;if(current==null||cancellation.IsCancellationRequested)return;
-            if(!current.AcceptWaveform(e.Buffer,e.BytesRecorded))return;
+            if(!current.AcceptWaveform(e.Buffer,e.BytesRecorded)){TryWakeFromPartial(current.PartialResult());return;}
             using var result=JsonDocument.Parse(current.Result());
             if(!result.RootElement.TryGetProperty("text",out var textNode))return;
             HandleText(textNode.GetString()??"");
         }
         catch(Exception ex) when(!disposed){status("语音识别已暂停："+ex.Message);}
+    }
+
+    void TryWakeFromPartial(string json)
+    {
+        if(commandDeadline!=DateTime.MinValue)return;
+        using var partial=JsonDocument.Parse(json);
+        if(partial.RootElement.TryGetProperty("partial",out var textNode)&&VoiceCommandParser.TrySplitWakeWord(textNode.GetString()??"",out _))OpenCommandWindow();
     }
 
     void HandleText(string text)
@@ -59,11 +67,16 @@ public sealed class VoiceAssistant : IDisposable
         var now=DateTime.UtcNow;
         if(VoiceCommandParser.TrySplitWakeWord(text,out var inline))
         {
-            commandDeadline=now.AddSeconds(5);timeout?.Dispose();timeout=new System.Threading.Timer(_=>CancelCommandWindow(),null,TimeSpan.FromSeconds(5),Timeout.InfiniteTimeSpan);listening(true);status("已唤醒，等待“搜索文件…”或“打开…”。");
+            OpenCommandWindow();
             if(!string.IsNullOrWhiteSpace(inline))Dispatch(inline);
             return;
         }
         if(now<=commandDeadline)Dispatch(text);
+    }
+
+    void OpenCommandWindow()
+    {
+        commandDeadline=DateTime.UtcNow.AddSeconds(commandTimeoutSeconds);timeout?.Dispose();timeout=new System.Threading.Timer(_=>CancelCommandWindow(),null,TimeSpan.FromSeconds(commandTimeoutSeconds),Timeout.InfiniteTimeSpan);listening(true);status("已唤醒，等待“搜索文件…”或“打开…”。");
     }
 
     void Dispatch(string text)

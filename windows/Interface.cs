@@ -272,6 +272,7 @@ public sealed class SettingsWindow : Form
         launch=Check("系统","手动启动时显示小窝",s.ShowLaunchMenu);
         pauseHidden=Check("系统","隐藏时暂停模拟",s.PauseWhenHidden);
         voice=Check("系统","启用本地离线语音控制（需安装中文语音包）",s.VoiceEnabled);
+        Num("系统",nameof(s.VoiceCommandTimeoutSeconds),"唤醒后等待指令 · 秒",2,10,s.VoiceCommandTimeoutSeconds);
 
         Button Footer(string text,int width,Action action,bool primary=false)
         {

@@ -19,6 +19,8 @@ internal static class Native
     [DllImport("gdi32.dll")] public static extern bool DeleteObject(nint obj);
     [DllImport("user32.dll",SetLastError=true)] public static extern bool UpdateLayeredWindow(nint w,nint dest,ref POINT p,ref SIZE size,nint src,ref POINT sp,uint key,ref BLEND blend,uint flags);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(nint w,nint after,int x,int y,int cx,int cy,uint flags);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(nint window,int command);
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
     [DllImport("user32.dll",SetLastError=true)] public static extern nint SetWindowsHookEx(int type,HookProc proc,nint module,uint thread);
