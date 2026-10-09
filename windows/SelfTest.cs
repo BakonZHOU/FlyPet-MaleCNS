@@ -16,6 +16,9 @@ static class SelfTest
         Simulation Make(Settings? settings=null){var s=new Simulation(settings??new Settings(),data,42);s.Recenter(area);return s;}
         void Advance(Simulation s,float seconds,bool swat=false,Vector2? cursor=null){for(int i=0;i<(int)(seconds*120);i++)s.Update(1f/120,area,cursor??mouse,swat);}
         var defaults=new Settings();Check("default_parameters",defaults.PetSize==90&&Math.Abs(defaults.AlbinoChance-.1f)<.0001f&&Math.Abs(defaults.GiantCockroachChance-.1f)<.0001f&&defaults.RespawnMinSeconds==45&&defaults.RespawnMaxSeconds==90&&defaults.SwatDamage==20&&defaults.EvanescenceChance==.30f&&defaults.RockSolidChance==.30f&&100/defaults.StarvationDamagePerSecond>=1200,new{petSize=defaults.PetSize,albinoChance=defaults.AlbinoChance,giantChance=defaults.GiantCockroachChance,swatDamage=defaults.SwatDamage,evanescence=defaults.EvanescenceChance,rockSolid=defaults.RockSolidChance,respawnMin=defaults.RespawnMinSeconds,respawnMax=defaults.RespawnMaxSeconds,starvationMinutes=100/defaults.StarvationDamagePerSecond/60});
+        bool wakeInline=VoiceCommandParser.TrySplitWakeWord("蝇蝇 打开 微信",out var inline);
+        var parsedSearch=VoiceCommandParser.Parse("搜索文件 毕业论文.pdf");var parsedLaunch=VoiceCommandParser.Parse(inline);
+        Check("offline_voice_command_parser",wakeInline&&inline=="打开微信"&&parsedSearch==new VoiceIntent(VoiceIntentKind.SearchFiles,"毕业论文pdf")&&parsedLaunch==new VoiceIntent(VoiceIntentKind.LaunchApp,"微信"),new{wakeInline,inline,parsedSearch,parsedLaunch});
         var fullStart=Make();var immortal=Make(new(){Invincible=true});immortal.Fullness=12;Advance(immortal,4);
         Check("fullness_starts_full_and_invincible_stays_full",fullStart.Fullness==100&&immortal.Fullness==100,new{initial=fullStart.Fullness,invincible=immortal.Fullness});
         using(var sound=new AbilitySound()){sound.StressVoicesForTest(64);Thread.Sleep(250);Check("ability_sounds_concurrent_native_buffers",true);}

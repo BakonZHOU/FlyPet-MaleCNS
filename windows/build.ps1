@@ -14,6 +14,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $Output 'Assets') -Force | Out-Null
     Copy-Item -LiteralPath 'Assets/cockroach-preview.png' -Destination (Join-Path $Output 'Assets/cockroach-preview.png') -Force
     Copy-Item -LiteralPath THIRD_PARTY.md -Destination (Join-Path $Output 'THIRD_PARTY.md') -Force
+    Copy-Item -LiteralPath Install-OfflineVoiceModel.ps1 -Destination (Join-Path $Output 'Install-OfflineVoiceModel.ps1') -Force
     Copy-Item -LiteralPath licenses -Destination $Output -Recurse -Force
     Write-Host "Ready: $Output/FlyPet.exe ($Runtime)"
 } finally { Pop-Location }

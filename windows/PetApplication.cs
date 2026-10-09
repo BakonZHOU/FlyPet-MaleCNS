@@ -50,6 +50,8 @@ public sealed class PetApplication : ApplicationContext
     readonly Icon icon;
     readonly MouseHook mouseHook;
     readonly LocalControl localControl;
+    VoiceAssistant? voiceAssistant;
+    FileSearchWindow? fileSearchWindow;
     readonly System.Windows.Forms.Timer timer=new();
     readonly Stopwatch clock=Stopwatch.StartNew();
     double previous,accumulator,statsPrevious,simulatedWindow,drawElapsed,nextStatusSave;
@@ -98,6 +100,7 @@ public sealed class PetApplication : ApplicationContext
         mouseHook=new(OnMouseDown,OnMouseMove,OnRightMouseDown,OnLeftMouseUp);
         Native.timeBeginPeriod(1);timer.Interval=TimerInterval();timer.Tick+=Tick;timer.Start();
         if(quiet||!Settings.ShowLaunchMenu)StartPet();else ShowDashboard();
+        UpdateVoiceAssistant();
         if(Settings.LoadWarning!=null)tray.ShowBalloonTip(5000,"FlyPet",Settings.LoadWarning,ToolTipIcon.Warning);
     }
     void Defer(Action action){if(dashboard.IsHandleCreated)dashboard.BeginInvoke(action);else action();}
@@ -183,8 +186,27 @@ public sealed class PetApplication : ApplicationContext
     public void TogglePause(){Paused=!Paused;if(Paused)SetMode(ToolMode.Normal);}
     public void SetMode(ToolMode mode){Mode=mode;if(mode==ToolMode.Normal){cursor.Hide();renderedCursorMode=ToolMode.Normal;}}
     int TimerInterval()=>Math.Clamp((int)Math.Round(1000d/Math.Max(1,Settings.FramesPerSecond)),1,50);
-    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);}
-    void ReloadSettings(){var s=Settings.Load();Sim.ChangeSkin(s.Skin);Settings=s;Sim.Settings=s;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();flySkinItem.Checked=s.Skin==PetSkin.Fly;roachSkinItem.Checked=s.Skin==PetSkin.Cockroach;if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
+    public void ApplySettings(){Settings.Validate();Settings.Save();Sim.Settings=Settings;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();while(Sim.Sugars.Count>Settings.MaxSugar)Sim.Sugars.RemoveAt(0);UpdateVoiceAssistant();}
+    void ReloadSettings(){var s=Settings.Load();Sim.ChangeSkin(s.Skin);Settings=s;Sim.Settings=s;timer.Interval=TimerInterval();Sim.Recenter(Area);dashboard.RefreshSkin();flySkinItem.Checked=s.Skin==PetSkin.Fly;roachSkinItem.Checked=s.Skin==PetSkin.Cockroach;UpdateVoiceAssistant();if(Settings.LoadWarning!=null)tray.ShowBalloonTip(3000,"设置",Settings.LoadWarning,ToolTipIcon.Warning);}
+    void UpdateVoiceAssistant()
+    {
+        voiceAssistant?.Dispose();voiceAssistant=null;
+        if(!Settings.VoiceEnabled)return;
+        voiceAssistant=new(Settings.VoiceModelFolder,PostVoiceStatus,HandleVoiceIntent);voiceAssistant.Start();
+    }
+    void PostVoiceStatus(string message)=>Defer(()=>tray.ShowBalloonTip(3500,"FlyPet · 本地语音",message,ToolTipIcon.Info));
+    void HandleVoiceIntent(VoiceIntent command)=>Defer(() =>
+    {
+        switch(command.Kind)
+        {
+            case VoiceIntentKind.SearchFiles:
+                fileSearchWindow??=new FileSearchWindow();fileSearchWindow.Search(command.Value,Settings.VoiceSearchFolders);break;
+            case VoiceIntentKind.LaunchApp:
+                if(LocalAppLauncher.TryLaunch(command.Value,out var detail))PostVoiceStatus("已打开："+detail);
+                else PostVoiceStatus(detail);
+                break;
+        }
+    });
     bool OnMouseDown(Point p)
     {
         // Hook returns immediately. Work is deferred to the normal event loop; no synchronous rendering or I/O.
@@ -395,7 +417,7 @@ public sealed class PetApplication : ApplicationContext
     protected override void ExitThreadCore()
     {
         if(disposing)return;disposing=true;timer.Stop();localControl.Dispose();mouseHook.Dispose();Native.timeEndPeriod(1);tray.Visible=false;tray.ContextMenuStrip?.Dispose();tray.Dispose();icon.Dispose();
-        settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();ClearGhosts();abilitySound.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
+        voiceAssistant?.Dispose();fileSearchWindow?.Dispose();settingsWindow?.Dispose();evidenceWindow?.Dispose();brainMap?.Dispose();deathMenu?.Dispose();pet.Dispose();cursor.Dispose();speech.Dispose();ClearGhosts();abilitySound.Dispose();foreach(var w in sugarWindows)w.Dispose();renderer.Dispose();timer.Dispose();dashboard.Shutdown();base.ExitThreadCore();
     }
 }
 

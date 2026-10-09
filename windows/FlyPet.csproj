@@ -3,9 +3,11 @@
     <OutputType>WinExe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest><AssemblyName>FlyPet</AssemblyName>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Version>1.1.13</Version><AssemblyVersion>1.1.13.0</AssemblyVersion><FileVersion>1.1.13.0</FileVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><Version>1.2.0</Version><AssemblyVersion>1.2.0.0</AssemblyVersion><FileVersion>1.2.0.0</FileVersion>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Vosk" Version="0.3.38" />
     <EmbeddedResource Include="Assets/circuit.json" />
     <EmbeddedResource Include="Assets/Audio/*.wav" />
   </ItemGroup>

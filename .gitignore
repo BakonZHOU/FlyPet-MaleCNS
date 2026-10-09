@@ -4,6 +4,7 @@ dist/
 .build/
 releases/latest/*
 test-results/
+test-results-*/
 test-results-tuned*/
 test-results-cursor*/
 test-results-albino*/

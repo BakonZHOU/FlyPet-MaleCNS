@@ -141,7 +141,7 @@ public sealed class SettingsWindow : Form
 {
     readonly PetApplication app;
     readonly Dictionary<string,NumericUpDown> numbers=[];
-    readonly CheckBox meters,startup,launch,pauseHidden,invincible,edge,neuralSteering,rest;
+    readonly CheckBox meters,startup,launch,pauseHidden,invincible,edge,neuralSteering,rest,voice;
     readonly ComboBox monitor,skin;
 
     public void SyncSkin(PetSkin value){if(!IsDisposed)skin.SelectedIndex=(int)value;}
@@ -271,6 +271,7 @@ public sealed class SettingsWindow : Form
         startup=Check("系统","登录 Windows 时自动启动",s.StartWithWindows);
         launch=Check("系统","手动启动时显示小窝",s.ShowLaunchMenu);
         pauseHidden=Check("系统","隐藏时暂停模拟",s.PauseWhenHidden);
+        voice=Check("系统","启用本地离线语音控制（需安装中文语音包）",s.VoiceEnabled);
 
         Button Footer(string text,int width,Action action,bool primary=false)
         {
@@ -294,7 +295,7 @@ public sealed class SettingsWindow : Form
         monitor.SelectedIndex=Math.Min(defaults.MonitorIndex,monitor.Items.Count-1);
         skin.SelectedIndex=(int)defaults.Skin;
         meters.Checked=defaults.ShowMeters;startup.Checked=defaults.StartWithWindows;launch.Checked=defaults.ShowLaunchMenu;pauseHidden.Checked=defaults.PauseWhenHidden;
-        invincible.Checked=defaults.Invincible;edge.Checked=defaults.EdgeSensing;neuralSteering.Checked=defaults.NeuralSteering;rest.Checked=defaults.RestEnabled;
+        invincible.Checked=defaults.Invincible;edge.Checked=defaults.EdgeSensing;neuralSteering.Checked=defaults.NeuralSteering;rest.Checked=defaults.RestEnabled;voice.Checked=defaults.VoiceEnabled;
         Apply();
     }
 
@@ -314,7 +315,7 @@ public sealed class SettingsWindow : Form
             }
             if(s.Skin!=(PetSkin)skin.SelectedIndex)app.SelectSkin((PetSkin)skin.SelectedIndex);
             s.MonitorIndex=monitor.SelectedIndex;s.ShowMeters=meters.Checked;s.ShowLaunchMenu=launch.Checked;s.PauseWhenHidden=pauseHidden.Checked;
-            s.Invincible=invincible.Checked;s.EdgeSensing=edge.Checked;s.NeuralSteering=neuralSteering.Checked;s.RestEnabled=rest.Checked;
+            s.Invincible=invincible.Checked;s.EdgeSensing=edge.Checked;s.NeuralSteering=neuralSteering.Checked;s.RestEnabled=rest.Checked;s.VoiceEnabled=voice.Checked;
             using var key=Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run");
             if(startup.Checked)key.SetValue("FlyPet",$"\"{Environment.ProcessPath}\" --quiet");else key.DeleteValue("FlyPet",false);
             s.StartWithWindows=startup.Checked;app.ApplySettings();Close();

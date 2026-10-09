@@ -7,7 +7,7 @@ public enum PetSkin { Fly, Cockroach }
 public sealed class Settings
 {
     public const int MinPetSize=60,MaxPetSize=800;
-    public int SchemaVersion { get; set; } = 12;
+    public int SchemaVersion { get; set; } = 13;
     public PetSkin Skin { get; set; } = PetSkin.Fly;
     public int FramesPerSecond { get; set; } = 90;
     public int PetSize { get; set; } = 90;
@@ -52,6 +52,8 @@ public sealed class Settings
     public bool StartWithWindows { get; set; }
     public bool ShowLaunchMenu { get; set; }
     public bool PauseWhenHidden { get; set; } = true;
+    public bool VoiceEnabled { get; set; }
+    public List<string> VoiceSearchFolders { get; set; } = DefaultVoiceSearchFolders();
     public static string Folder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FlyPet");
     public static string FileName => Path.Combine(Folder, "settings.json");
     public static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNameCaseInsensitive = true };
@@ -111,6 +113,7 @@ public sealed class Settings
                 s.SchemaVersion=11;changed=true;
             }
             if(exists&&storedSchema<12){s.SchemaVersion=12;changed=true;}
+            if(exists&&storedSchema<13){s.VoiceSearchFolders=DefaultVoiceSearchFolders();s.SchemaVersion=13;changed=true;}
             if(changed)s.Save();
             s.Validate(); return s;
         }
@@ -141,10 +144,13 @@ public sealed class Settings
         SugarReward=Safe(SugarReward,0,2,1);EdgePunishment=Safe(EdgePunishment,0,2,.75f);
         CollisionMemoryDiameter=Safe(CollisionMemoryDiameter,80,1200,300);
         MonitorIndex = Math.Max(0, MonitorIndex);
+        VoiceSearchFolders=VoiceSearchFolders?.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList()??DefaultVoiceSearchFolders();
     }
     public void Save()
     {
         Validate(); Directory.CreateDirectory(Folder);
         var temp = FileName + ".tmp"; File.WriteAllText(temp, JsonSerializer.Serialize(this,JsonOptions)); File.Move(temp,FileName,true);
     }
+    public static string VoiceModelFolder => Path.Combine(Folder,"models","vosk-model-small-cn-0.22");
+    static List<string> DefaultVoiceSearchFolders()=>new[]{Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),"Downloads")}.Where(Directory.Exists).ToList();
 }
