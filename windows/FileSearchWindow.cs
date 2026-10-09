@@ -22,13 +22,28 @@ public sealed class FileSearchWindow : Form
     public async void Search(string query,IEnumerable<string> roots)
     {
         searchCancellation?.Cancel();searchCancellation=new CancellationTokenSource(TimeSpan.FromSeconds(15));var cancellation=searchCancellation;
-        results.Items.Clear();summary.Text=$"正在本机搜索“{query}”…";Show();BringToFront();Activate();
+        results.Items.Clear();Show();BringToFront();Activate();
         try
         {
-            var found=await LocalFileSearch.SearchAsync(roots,query,cancellation.Token);
+            IReadOnlyList<string> found=[];string source;
+            if(EverythingSearch.HasSdk)
+            {
+                summary.Text=$"正在通过 Everything 搜索“{query}”…";
+                bool ok=await Task.Run(()=>EverythingSearch.TrySearch(query,out found,out var error),cancellation.Token);
+                if(!ok){summary.Text="Everything 不可用，改用本地搜索。";found=await LocalFileSearch.SearchAsync(roots,query,cancellation.Token);source="本地文件夹";}else source="Everything 索引";
+            }
+            else
+            {
+                if(EverythingSearch.IsRunning&&MessageBox.Show(this,"已检测到 Everything，但缺少轻量查询组件。现在下载并启用吗？","FlyPet",MessageBoxButtons.YesNo,MessageBoxIcon.Question)==DialogResult.Yes)
+                {
+                    summary.Text="正在下载 Everything 查询组件…";await EverythingSearch.InstallSdkAsync(cancellation.Token);Search(query,roots);return;
+                }
+                if(!EverythingSearch.IsRunning)summary.Text="未检测到 Everything，已改用本地搜索。可安装 Everything 后获得全盘快速搜索。";
+                found=await LocalFileSearch.SearchAsync(roots,query,cancellation.Token);source="本地文件夹";
+            }
             if(IsDisposed||cancellation.IsCancellationRequested)return;
             foreach(var path in found)results.Items.Add(path);
-            summary.Text=found.Count==0?$"没有在已配置的本地文件夹中找到“{query}”。":$"找到 {found.Count} 个结果；双击即可打开。";
+            summary.Text=found.Count==0?$"没有找到“{query}”。":$"通过{source}找到 {found.Count} 个结果；双击即可打开。";
         }
         catch(OperationCanceledException){}catch(Exception e){if(!IsDisposed)summary.Text="搜索失败："+e.Message;}
     }
