@@ -1,8 +1,5 @@
 name: Build and self-test
 
-env:
-  RELEASE_VERSION: 1.1.13
-
 on:
   push:
     branches: [main]
@@ -11,8 +8,31 @@ on:
     branches: [main]
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.read.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read release version
+        id: read
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_TYPE -eq 'tag') {
+            $version = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            [xml]$project = Get-Content ./windows/FlyPet.csproj -Raw
+            $version = [string]$project.Project.PropertyGroup.Version
+          }
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Unable to determine release version.' }
+          "value=$version" >> $env:GITHUB_OUTPUT
+
   windows:
+    needs: version
     runs-on: windows-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -29,7 +49,34 @@ jobs:
       - name: Package Windows x64
         shell: pwsh
         run: |
-          ./package.ps1 windows-x64 -Version ${{ env.RELEASE_VERSION }}
+          ./package.ps1 windows-x64 -Version ${{ needs.version.outputs.value }}
+      - name: Sign in to Azure for Artifact Signing
+        if: github.ref_type == 'tag' && vars.AZURE_ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign Windows executable
+        if: github.ref_type == 'tag' && vars.AZURE_ARTIFACT_SIGNING_ENDPOINT != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.AZURE_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.AZURE_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_ARTIFACT_SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\releases\latest\windows-x64\FlyPet.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Verify signature and refresh archive
+        if: github.ref_type == 'tag' && vars.AZURE_ARTIFACT_SIGNING_ENDPOINT != ''
+        shell: pwsh
+        run: |
+          $exe = '.\releases\latest\windows-x64\FlyPet.exe'
+          $signature = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($signature.Status -ne 'Valid') { throw "Invalid Windows signature: $($signature.Status)" }
+          $archive = '.\releases\latest\FlyPet-${{ needs.version.outputs.value }}-windows-x64.zip'
+          Compress-Archive -Path '.\releases\latest\windows-x64\*' -DestinationPath $archive -Force
       - uses: actions/upload-artifact@v4
         with:
           name: FlyPet-windows-x64
@@ -38,6 +85,7 @@ jobs:
 
   macos:
     name: macOS ${{ matrix.label }}
+    needs: version
     runs-on: macos-14
     strategy:
       fail-fast: false
@@ -54,7 +102,7 @@ jobs:
       - name: Build app and DMG
         env:
           ARCHS: ${{ matrix.archs }}
-          VERSION: ${{ env.RELEASE_VERSION }}
+          VERSION: ${{ needs.version.outputs.value }}
         run: ./macos/build.sh
       - name: Verify bundle
         run: |
@@ -74,11 +122,12 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [windows, macos]
+    needs: [version, windows, macos]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           pattern: FlyPet-macOS-*
@@ -88,28 +137,22 @@ jobs:
         with:
           name: FlyPet-windows-x64
           path: release
+      - name: Prepare release notes
+        shell: pwsh
+        run: |
+          $version = '${{ needs.version.outputs.value }}'
+          $lines = Get-Content ./CHANGELOG.md
+          $start = [Array]::FindIndex($lines, [Predicate[string]]{ param($line) $line -match "^## \[$([regex]::Escape($version))\]" })
+          if ($start -lt 0) { throw "CHANGELOG.md does not contain version $version." }
+          $end = $lines.Length
+          for ($i = $start + 1; $i -lt $lines.Length; $i++) {
+            if ($lines[$i] -match '^## \[') { $end = $i; break }
+          }
+          $lines[$start..($end - 1)] | Set-Content ./release-notes.md -Encoding utf8
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             release/*.dmg
             release/*.zip
-          body: |
-            ## 下载
-
-            | 设备 | 文件 |
-            | --- | --- |
-            | Windows 10/11（Intel/AMD） | `FlyPet-${{ env.RELEASE_VERSION }}-windows-x64.zip` |
-            | Mac（M 系列芯片） | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-arm64.dmg` |
-            | Intel Mac | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-x86_64.dmg` |
-            | 不确定 Mac 芯片 | `FlyPet-${{ env.RELEASE_VERSION }}-macOS-arm64-x86_64.dmg` |
-
-            Windows 解压后双击 `FlyPet.exe`。Mac 打开 DMG 后将应用拖入“应用程序”。
-
-            macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按应用，再选择“打开”。
-
-            ## 本版重点
-
-            共享脑引擎继续以 1 ms 步长计算全部神经元和突触，同时减少重复的群组扫描，改善老设备上的运行效率。Windows 版同时加入糖粒拖动、右键取消投糖及召回后的计时修正。
-
-            macOS 使用相同的 v1.1.13 脑引擎与模拟逻辑，提供 Apple Silicon、Intel 和 Universal 2 三种安装包。
+          body_path: release-notes.md
 

@@ -4,7 +4,7 @@
 
 ## 下载与安装
 
-从 [Releases](../../releases) 下载对应文件；不需要 Python、GPU 或额外运行时。
+从 [GitHub Releases](https://github.com/BakonZHOU/FlyPet-MaleCNS/releases) 下载对应文件；不需要 Python、GPU 或额外运行时。各版本的简要变化见 [更新日志](CHANGELOG.md)。
 
 | 你的设备 | 下载文件 | 安装方式 |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按
 - 通过托盘/菜单栏投糖、暂停、复活、召回和切换外观；投糖前可按右键取消，已经放下的糖粒可用左键拖动。
 - 果蝇与广东双马尾两套动态外观，包含稀有个体和可调尺寸。
 - Windows 版提供大脑活动图、神经连接证据和本地命令控制。
-- Windows 版可选本地离线语音控制：安装中文语音包后，说“强强”或“蝇蝇”，再说“搜索文件 <名称>”或“打开 <软件>”。文件搜索优先使用已运行的 Everything；首次检测到 Everything 时可一键下载官方 SDK 查询组件，未安装或未运行则回退到桌面、文档和下载。软件从开始菜单快捷方式匹配，微信额外检查常见安装目录。语音不会上传，且默认关闭。
+- Windows 版可选本地离线语音控制：安装中文 Vosk 语音包后，说“强强”或“蝇蝇”即可唤醒，用一句话执行“搜索文件 <名称>”或“打开 <软件>”。搜索会打开原生 Everything 窗口并填入关键词；软件启动支持默认浏览器、微信现有窗口、Apple Music、ChatGPT 和开始菜单应用。识别完全离线，等待时间可调，且默认关闭。
 
 ![蟑螂皮肤的奔跑与飞行动画](windows/Assets/cockroach-preview.png)
 
@@ -40,6 +40,8 @@ macOS 首次打开如出现安全提示，请在 Finder 中按住 Control 点按
 ## 本地打包
 
 Windows：`./package.ps1 windows-x64`（也支持 `windows-arm64`）。macOS：`./package.sh macos-arm64`、`./package.sh macos-x64` 或 `./package.sh macos-universal`。所有安装包均写入 `releases/latest/`，临时编译文件统一写入 `.build/`；完整的 Mac 构建说明见 [macOS 说明](macos/README.md)。
+
+Windows 发布流程已预留微软 Artifact Signing：未配置证书时生成未签名包，配置后会在上传前签名、校验并重新压缩。所需账户、GitHub OIDC 和仓库变量见 [Windows EXE 签名说明](docs/WINDOWS-SIGNING.md)。
 
 ## 大脑与真实性
 
@@ -75,7 +77,7 @@ python .\windows\tools\verify_source.py --hash-weights
 
 设置文件在 `%LOCALAPPDATA%\FlyPet\settings.json`，可在设置窗口修改并从托盘重新加载。设置窗口可以缩放且不再强制置顶，顶部按“外观 / 生存 / 行为 / 神经 / 系统”分类。桌宠初始饱食度为 100；默认饱食消耗已降低，无敌模式会始终保持满饱食。尺寸范围为 60–800 px。“恢复默认”会保存并应用默认值。Windows 版已内置瞬机起手、命中与铜头铁臂成功音效，使用独立音频声部避免连续触发时互相截断，并保持音频设备预热。音频驱动操作在动画线程之外完成，铜头铁臂强化闪光、振翅和音效始终开启；招式结束后只保留约 0.1 秒无敌缓冲。若要临时替换，可将 WAV 放到同一配置目录，命名为 `evanescence.wav` 与 `rock-solid.wav`；前者替换瞬机整组音效，后者替换铜头铁臂音效。高级使用者可把符合 `windows/Assets/circuit.json` 格式的自定义回路放到设置目录作为覆盖文件；移走后恢复内置回路。
 
-要启用本地语音控制，先在 Windows 发行包目录运行 `Install-OfflineVoiceModel.ps1`；它只下载一次约 42 MB 的中文 Vosk 模型至 `%LOCALAPPDATA%\FlyPet\models`。然后在“外观与设置 → 系统”勾选“启用本地离线语音控制”。首次使用 Windows 可能要求授予麦克风权限。该功能不使用云端识别，也不播放语音反馈；识别状态通过系统通知提示。
+要启用本地语音控制，先在 Windows 发行包目录运行 `Install-OfflineVoiceModel.ps1`；它只下载一次约 42 MB 的中文 Vosk 模型至 `%LOCALAPPDATA%\FlyPet\models`。然后通过托盘右键菜单打开“本地语音控制”，也可在“外观与设置 → 系统”中调整指令等待时间。首次使用 Windows 可能要求授予麦克风权限。该功能不使用云端识别，也不播放语音反馈；唤醒后桌宠会在约 0.3 秒内转向屏幕中心，并用问号气泡表示正在等待指令。
 
 现有实例可以接收本地命名管道命令，例如 `dist/FlyPet.exe --command brain-map`、`--command revive`、`--command skin cockroach`、`--command skin fly`、`--command invincible on`、`--command status --output <路径>`。完整命令还包括 `show`、`hide`、`menu`、`settings`、`evidence`、`audit`、`pause`、`resume`、`normal`、`sugar-mode`、`drop x y`、`swat x y`、`recall`、`clear`、`reload`、`exit`。`swatter` 仅作为旧脚本兼容别名，不会显示苍蝇拍模式；`swat x y` 仍可用于自动化测试点击。`status.json` 定期写到设置目录。
 
